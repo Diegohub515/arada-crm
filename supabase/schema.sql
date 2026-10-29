@@ -598,3 +598,14 @@ begin
     execute format('create policy equipo_todo on public.%I for all to authenticated using (true) with check (true)', t);
   end loop;
 end $$;
+
+-- =====================================================================
+-- Cotizaciones con esquema de pago (10-15-75, 15-15-70) y plan con fechas
+-- =====================================================================
+alter table public.cotizaciones
+  add column if not exists esquema text,
+  add column if not exists descuento_monto numeric(14,2) not null default 0,
+  add column if not exists num_pagos_enganche int not null default 1,
+  add column if not exists fecha_primer_pago date,
+  add column if not exists fecha_escrituracion date,
+  add column if not exists apartado numeric(14,2) not null default 10000;

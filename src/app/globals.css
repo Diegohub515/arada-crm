@@ -335,7 +335,7 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 /* ---------- Comercialización ---------- */
 .punto { display: inline-block; width: 9px; height: 9px; border-radius: 3px; background: var(--texto-3); }
 .punto.bien { background: var(--bien); } .punto.aviso { background: var(--aviso); }
-.punto.acento { background: var(--acento); } .punto.info { background: var(--info); } .punto.neutro { background: var(--texto-3); }
+.punto.acento { background: var(--acento); } .punto.mal { background: var(--mal); } .punto.info { background: var(--info); } .punto.neutro { background: var(--texto-3); }
 .filtro-kpi { text-align: left; cursor: pointer; font: inherit; color: inherit; }
 .filtro-kpi:hover { border-color: var(--acento); }
 .filtro-kpi.activo { border-color: var(--acento); box-shadow: 0 0 0 3px var(--acento-suave); }
@@ -354,7 +354,7 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 .depa:hover { box-shadow: var(--sombra-flotante); transform: translateY(-1px); }
 .depa.disponible { border-left-color: var(--bien); background: var(--bien-suave); }
 .depa.separada { border-left-color: var(--aviso); background: var(--aviso-suave); }
-.depa.vendida { border-left-color: var(--info); background: var(--info-suave); opacity: 0.85; }
+.depa.vendida { border-left-color: var(--mal); background: var(--mal-suave); opacity: 0.85; }
 .depa.bloqueada { border-left-color: var(--texto-3); background: repeating-linear-gradient(-45deg, var(--superficie-2) 0 6px, var(--superficie) 6px 12px); }
 .leyenda { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--texto-2); }
 .leyenda span { display: inline-flex; align-items: center; gap: 6px; }
@@ -439,3 +439,44 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 .feedback-bot { display: inline-flex; gap: 2px; margin-left: 6px; vertical-align: middle; }
 .feedback-bot button { border: 0; background: transparent; cursor: pointer; padding: 0 3px; font-size: 12px; opacity: .55; }
 .feedback-bot button:hover, .feedback-bot button.activo { opacity: 1; }
+
+/* Lista de precios A–D (Inventario) */
+.lista-tipos { display: flex; flex-direction: column; gap: 18px; }
+.lista-tipo-cab { display: flex; align-items: center; gap: 12px; padding: 14px 16px 10px; flex-wrap: wrap; }
+.lista-tipo-cab .letra { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; font-size: 19px; background: var(--acento); color: #fff; }
+.lista-tipo-cab small { color: var(--texto-2); }
+.tabla tr.fila-disponible td:first-child { box-shadow: inset 4px 0 0 var(--bien); }
+.tabla tr.fila-disponible td { background: color-mix(in srgb, var(--bien-suave) 55%, transparent); }
+.tabla tr.fila-vendida td { background: color-mix(in srgb, var(--mal-suave) 70%, transparent); color: var(--texto-2); }
+.tabla tr.fila-vendida td:first-child { box-shadow: inset 4px 0 0 var(--mal); }
+.tabla tr.fila-separada td { background: color-mix(in srgb, var(--aviso-suave) 70%, transparent); }
+.tabla tr.fila-separada td:first-child { box-shadow: inset 4px 0 0 var(--aviso); }
+.tabla tr.fila-bloqueada td { color: var(--texto-3); }
+.tabla tr.fila-bloqueada td:first-child { box-shadow: inset 4px 0 0 var(--texto-3); }
+.tachado { text-decoration: line-through; color: var(--texto-3); }
+
+/* Cotizador */
+.esquemas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.esquema-op { border: 1.5px solid var(--borde); background: var(--superficie); border-radius: 10px; padding: 10px; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 3px; font: inherit; color: inherit; }
+.esquema-op b { font-size: 15px; }
+.esquema-op small { color: var(--texto-3); font-size: 11.5px; }
+.esquema-op.activo { border-color: var(--acento); background: var(--acento-suave); }
+.barra-esquema { display: flex; height: 10px; border-radius: 99px; overflow: hidden; background: var(--superficie-2); }
+.barra-esquema span:nth-child(1) { background: var(--acento); }
+.barra-esquema span:nth-child(2) { background: #7fb98d; }
+.barra-esquema span:nth-child(3) { background: #c9dfcf; }
+.resumen-cot { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.resumen-cot > div { background: var(--superficie-2); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.resumen-cot small { color: var(--texto-3); font-size: 11.5px; }
+.resumen-cot b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.resumen-cot .destacado { background: var(--acento); color: #fff; }
+.resumen-cot .destacado small { color: rgba(255,255,255,.8); }
+.tabla-plan { max-height: 320px; overflow: auto; border: 1px solid var(--borde); border-radius: 10px; }
+.tabla-plan table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tabla-plan th { position: sticky; top: 0; background: var(--superficie-2); text-align: left; font-size: 11.5px; color: var(--texto-2); padding: 7px 10px; }
+.tabla-plan td { padding: 6px 10px; border-top: 1px solid var(--borde); font-variant-numeric: tabular-nums; }
+.tabla-plan td.der, .tabla-plan th.der { text-align: right; }
+.tabla-plan tr.eng td { background: var(--acento-suave); }
+.tabla-plan tr.esc td { background: var(--superficie-2); font-weight: 700; }
+@media (max-width: 640px) { .resumen-cot { grid-template-columns: repeat(2, minmax(0, 1fr)); } .esquemas { grid-template-columns: 1fr; } }
+.enlace { background: none; border: 0; padding: 0; color: var(--acento-texto); text-decoration: underline; cursor: pointer; font: inherit; }

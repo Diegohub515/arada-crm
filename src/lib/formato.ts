@@ -5,6 +5,12 @@ export function dinero(n: number | null | undefined) {
   return n == null ? "—" : mxn.format(Number(n));
 }
 
+const mxnExacto = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** Con centavos, para planes de pago. */
+export function dineroExacto(n: number | null | undefined) {
+  return n == null ? "—" : mxnExacto.format(Number(n));
+}
+
 export function dineroCorto(n: number | null | undefined) {
   return n == null ? "—" : "$" + mxnCorto.format(Number(n));
 }

@@ -58,7 +58,7 @@ const SELECCION: Record<TablaOpciones, string> = {
   brokers: "id, nombre",
   proveedores: "id, nombre",
   ordenes_compra: "id, concepto, folio",
-  unidades: "id, desarrollo, torre, numero, tipologia, estado",
+  unidades: "id, desarrollo, torre, nivel, numero, tipologia, estado, vista, precio_lista",
   leads: "id, nombre, telefono",
   cotizaciones: "id, folio, precio_final, unidades(torre, numero), leads(nombre)",
   separaciones: "id, monto, estado, unidades(torre, numero), leads(nombre)",
@@ -68,7 +68,11 @@ function etiquetaOpcion(tabla: TablaOpciones, r: any): string {
   switch (tabla) {
     case "ordenes_compra": return `${r.folio ? r.folio + " · " : ""}${r.concepto}`;
     case "perfiles": return r.nombre || r.email || "Sin nombre";
-    case "unidades": return `${r.desarrollo} ${r.torre}-${r.numero}${r.tipologia ? " · " + r.tipologia : ""} (${r.estado})`;
+    case "unidades": {
+      const clave = /^[A-Za-z]\d{3,}$/.test(r.numero) ? r.numero : `${r.torre}-${r.numero}`;
+      const precio = Number(r.precio_lista) ? " · $" + Number(r.precio_lista).toLocaleString("es-MX") : "";
+      return `${r.desarrollo} ${clave}${r.tipologia ? " · Tipo " + r.tipologia : ""}${r.vista ? " · " + r.vista : ""}${precio} (${r.estado})`;
+    }
     case "leads": return `${r.nombre}${r.telefono ? " · " + r.telefono : ""}`;
     case "cotizaciones": return `${r.folio ?? "COT"} · ${r.unidades ? r.unidades.torre + "-" + r.unidades.numero : ""} · ${r.leads?.nombre ?? "sin cliente"}`;
     case "separaciones": return `${r.unidades ? r.unidades.torre + "-" + r.unidades.numero : ""} · ${r.leads?.nombre ?? "sin cliente"} (${r.estado})`;
@@ -83,7 +87,7 @@ export function useOpciones(tabla: TablaOpciones | null) {
     if (!tabla) return;
     let q = supabaseNavegador().from(tabla).select(SELECCION[tabla]);
     if (tabla === "leads") q = q.order("created_at", { ascending: false }).limit(1000);
-    if (tabla === "unidades") q = q.order("torre").order("nivel").order("numero");
+    if (tabla === "unidades") q = q.order("tipologia").order("numero");
     q.then(({ data }: { data: any[] | null }) => {
       setOpciones((data ?? []).map((r) => ({ id: r.id, nombre: etiquetaOpcion(tabla, r), fila: r })));
     });

@@ -7,6 +7,7 @@ import { Pastilla, Ventana, useToast } from "@/components/ui";
 import { supabaseNavegador } from "@/lib/supabase/client";
 import { DESARROLLOS } from "@/lib/tipos";
 import { dinero, dineroCorto, fecha } from "@/lib/formato";
+import { nombreDepto } from "@/lib/cotizacion";
 
 type Unidad = {
   id: string; desarrollo: string; torre: string; nivel: number; numero: string; tipologia: string | null;
@@ -17,7 +18,7 @@ type Unidad = {
 const ESTADOS_UNIDAD = [
   { id: "disponible", nombre: "Disponible", tono: "bien" },
   { id: "separada", nombre: "Separada", tono: "aviso" },
-  { id: "vendida", nombre: "Vendida", tono: "info" },
+  { id: "vendida", nombre: "Vendida", tono: "mal" },
   { id: "bloqueada", nombre: "Bloqueada", tono: "neutro" },
 ];
 const tono = (e: string) => ESTADOS_UNIDAD.find((x) => x.id === e)?.tono ?? "neutro";
@@ -36,7 +37,7 @@ export default function Inventario() {
   const [error, setError] = useState<string | null>(null);
   const [desarrollo, setDesarrollo] = useState("VRO");
   const [torre, setTorre] = useState("todas");
-  const [vista, setVista] = useState<"torre" | "tabla">("torre");
+  const [vista, setVista] = useState<"torre" | "tabla">("tabla");
   const [filtroEstado, setFiltroEstado] = useState("todos");
   const [abierta, setAbierta] = useState<Unidad | null>(null);
   const [editando, setEditando] = useState<Partial<Unidad> | null>(null);
@@ -101,6 +102,17 @@ export default function Inventario() {
       .sort((a, b) => a.torre.localeCompare(b.torre) || b.nivel - a.nivel);
   }, [visibles]);
 
+  // Lista de precios: tipología A → D, luego vista, del nivel más alto al más bajo
+  const porTipologia = useMemo(() => {
+    const mapa = new Map<string, Unidad[]>();
+    for (const u of visibles) { const t = u.tipologia ?? "Sin tipo"; mapa.set(t, [...(mapa.get(t) ?? []), u]); }
+    return Array.from(mapa.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([tipo, us]) => {
+      us.sort((a, b) => b.torre.localeCompare(a.torre) || b.nivel - a.nivel || a.numero.localeCompare(b.numero, "es", { numeric: true }));
+      const precios = us.filter((u) => u.estado === "disponible" && Number(u.precio_lista) > 0).map((u) => Number(u.precio_lista));
+      return { tipo, us, ejemplo: us[0], disp: us.filter((u) => u.estado === "disponible").length, desde: precios.length ? Math.min(...precios) : 0 };
+    });
+  }, [visibles]);
+
   return (
     <>
       <Barra titulo="Inventario" icono={<Building2 size={18} />}>
@@ -116,14 +128,14 @@ export default function Inventario() {
           </div>
           {torres.length > 1 && (
             <select id="f-torre" className="entrada" style={{ width: "auto" }} value={torre} onChange={(e) => setTorre(e.target.value)}>
-              <option value="todas">Todas las torres</option>
-              {torres.map((t) => <option key={t} value={t}>Torre {t}</option>)}
+              <option value="todas">Todas</option>
+              {torres.map((t) => <option key={t} value={t}>{/^(norte|sur|oriente|poniente)$/i.test(t) ? `Vista ${t}` : `Torre ${t}`}</option>)}
             </select>
           )}
           <div className="espacio" />
           <div className="segmentos">
             <button className={vista === "torre" ? "activo" : ""} onClick={() => setVista("torre")}><Building2 size={13} /> Torre</button>
-            <button className={vista === "tabla" ? "activo" : ""} onClick={() => setVista("tabla")}><Table2 size={13} /> Tabla</button>
+            <button className={vista === "tabla" ? "activo" : ""} onClick={() => setVista("tabla")}><Table2 size={13} /> Lista A–D</button>
           </div>
         </div>
 
@@ -158,7 +170,7 @@ export default function Inventario() {
                     <div className="torre-etiqueta">{torres.length > 1 ? `${n.torre} · ` : ""}N{n.nivel}</div>
                     <div className="torre-unidades">
                       {n.us.map((u) => (
-                        <button key={u.id} className={`depa ${u.estado}`} onClick={() => setAbierta(u)} title={`${u.numero} · ${nombreEstado(u.estado)}`}>
+                        <button key={u.id} className={`depa ${u.estado}`} onClick={() => setAbierta(u)} title={`${nombreDepto(u)} · ${nombreEstado(u.estado)}`}>
                           <b>{u.numero}</b>
                           <small>{u.tipologia ?? (u.recamaras ? `${u.recamaras} rec` : "")}</small>
                           <small className="num">{u.estado === "vendida" ? "Vendido" : dineroCorto(u.precio_lista)}</small>
@@ -176,31 +188,49 @@ export default function Inventario() {
         )}
 
         {vista === "tabla" && visibles.length > 0 && (
-          <div className="tarjeta"><div className="tabla-caja">
-            <table className="tabla">
-              <thead><tr><th>Depto.</th><th>Nivel</th><th>Tipología</th><th className="der">m²</th><th className="der">Precio</th><th className="der">$ / m²</th><th>Estado</th></tr></thead>
-              <tbody>
-                {visibles.map((u) => {
-                  const m2 = Number(u.m2_interior ?? 0) + Number(u.m2_terraza ?? 0);
-                  return (
-                    <tr key={u.id} onClick={() => setAbierta(u)}>
-                      <td><b>{u.torre}-{u.numero}</b></td><td>{u.nivel}</td><td>{u.tipologia ?? "—"}</td>
-                      <td className="der num">{m2 || "—"}</td><td className="der num">{dinero(u.precio_lista)}</td>
-                      <td className="der num">{m2 ? dinero(u.precio_lista / m2) : "—"}</td>
-                      <td><Pastilla tono={tono(u.estado)}>{nombreEstado(u.estado)}</Pastilla></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div></div>
+          <div className="lista-tipos">
+            {porTipologia.map((g) => (
+              <div className="tarjeta" key={g.tipo}>
+                <div className="lista-tipo-cab">
+                  <span className="letra">{g.tipo}</span>
+                  <div>
+                    <b>Tipo {g.tipo}</b><br />
+                    <small>{g.ejemplo?.recamaras ? `${g.ejemplo.recamaras} recámaras · ` : ""}{g.ejemplo?.m2_interior ? `${g.ejemplo.m2_interior} m² · ` : ""}{g.disp} disponibles de {g.us.length}{g.desde ? ` · desde ${dinero(g.desde)}` : ""}</small>
+                  </div>
+                </div>
+                <div className="tabla-caja">
+                  <table className="tabla">
+                    <thead><tr><th>Depto.</th><th>Vista</th><th>Nivel</th><th className="der">m²</th><th className="der">Precio</th><th className="der">$ / m²</th><th>Estado</th></tr></thead>
+                    <tbody>
+                      {g.us.map((u) => {
+                        const m2 = Number(u.m2_interior ?? 0) + Number(u.m2_terraza ?? 0);
+                        const conPrecio = u.estado !== "vendida" && Number(u.precio_lista) > 0;
+                        return (
+                          <tr key={u.id} className={`fila-${u.estado}`} onClick={() => setAbierta(u)}>
+                            <td><b>{nombreDepto(u)}</b></td><td>{u.vista ?? u.torre}</td><td>{u.nivel}</td>
+                            <td className="der num">{m2 || "—"}</td>
+                            <td className="der num">{conPrecio ? dinero(u.precio_lista) : u.estado === "vendida" ? <span className="tachado">Vendido</span> : "—"}</td>
+                            <td className="der num">{conPrecio && m2 ? dinero(u.precio_lista / m2) : "—"}</td>
+                            <td><Pastilla tono={tono(u.estado)}>{nombreEstado(u.estado)}</Pastilla></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+            <div className="leyenda" style={{ padding: "0 4px" }}>
+              {ESTADOS_UNIDAD.map((e) => <span key={e.id}><span className={`punto ${e.tono}`} /> {e.nombre}</span>)}
+            </div>
+          </div>
         )}
       </div>
 
       {abierta && <FichaUnidad u={abierta} onCerrar={() => setAbierta(null)} onEditar={() => { setEditando(abierta); setAbierta(null); }} onBloquear={() => bloquear(abierta)} />}
 
       {editando && (
-        <Ventana titulo={editando.id ? `Editar ${editando.torre}-${editando.numero}` : "Nuevo departamento"} onCerrar={() => setEditando(null)}>
+        <Ventana titulo={editando.id ? `Editar ${nombreDepto(editando)}` : "Nuevo departamento"} onCerrar={() => setEditando(null)}>
           <form id="form-unidad" className="formulario" onSubmit={guardar}>
             <div className="campo">
               <label htmlFor="u-des">Desarrollo</label>
@@ -255,8 +285,8 @@ function FichaUnidad({ u, onCerrar, onEditar, onBloquear }: { u: Unidad; onCerra
   const m2 = Number(u.m2_interior ?? 0) + Number(u.m2_terraza ?? 0);
   const libre = u.estado === "disponible";
   return (
-    <Ventana lado onCerrar={onCerrar} titulo={<span style={{ display: "flex", gap: 10, alignItems: "center" }}>Depto. {u.torre}-{u.numero} <Pastilla tono={tono(u.estado)}>{nombreEstado(u.estado)}</Pastilla></span>}>
-      <div className="kpi-valor">{dinero(u.precio_lista)}</div>
+    <Ventana lado onCerrar={onCerrar} titulo={<span style={{ display: "flex", gap: 10, alignItems: "center" }}>Depto. {nombreDepto(u)} <Pastilla tono={tono(u.estado)}>{nombreEstado(u.estado)}</Pastilla></span>}>
+      <div className="kpi-valor">{u.estado === "vendida" ? "Vendido" : dinero(u.precio_lista)}</div>
       <div className="datos-depa">
         <div><small>Nivel</small><b>{u.nivel}</b></div>
         <div><small>Tipología</small><b>{u.tipologia ?? "—"}</b></div>
