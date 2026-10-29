@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { supabaseServidor } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { enviarMensaje, marcarLeida } from "@/lib/zernio";
+import { telefonoWhatsApp } from "@/lib/formato";
 
 export const runtime = "nodejs";
 
@@ -97,7 +98,7 @@ async function enviarPorZapier(
     }, { status: 400 });
   }
 
-  const telefono = conv.zernio_conversation_id.slice(3);
+  const telefono = telefonoWhatsApp(conv.zernio_conversation_id.slice(3));
   const mensajeId = crypto.randomUUID();
   const ahora = new Date().toISOString();
   const { data: fila, error } = await db.from("mensajes").insert({

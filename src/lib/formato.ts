@@ -41,6 +41,16 @@ export function normalizarTelefono(t: string | null | undefined) {
   return d || null;
 }
 
+/** Número listo para la API de WhatsApp: los de México (10 dígitos) llevan 52 al frente. */
+export function telefonoWhatsApp(t: string | null | undefined) {
+  if (!t) return null;
+  const d = String(t).replace(/\D/g, "");
+  if (!d) return null;
+  if (d.length === 10) return `52${d}`;
+  if (d.length === 13 && d.startsWith("521")) return `52${d.slice(3)}`;
+  return d;
+}
+
 export function hoyISO() {
   const d = new Date();
   const z = (n: number) => String(n).padStart(2, "0");
