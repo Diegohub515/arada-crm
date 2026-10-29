@@ -193,6 +193,7 @@ export function FichaLead({ id, onCerrar }: { id: string; onCerrar: () => void }
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Link className="boton primario" href={`/leads/${lead.id}`}>Abrir ficha completa</Link>
         {conv && <Link className="boton" href={`/bandeja?c=${conv.id}`}><MessageCircle size={15} /> Abrir chat</Link>}
         {lead.telefono && <span className="boton" style={{ cursor: "text", userSelect: "all" }}>{lead.telefono}</span>}
         <Link className="boton" href={`/cotizaciones?nuevo=1&lead_id=${lead.id}`}>Cotizar depto.</Link>

@@ -375,3 +375,61 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
   .velo { position: static; background: none; padding: 0; }
   .ventana { box-shadow: none; width: 100%; }
 }
+
+/* ---------- Ficha completa del lead ---------- */
+.pasos-lead { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--superficie); border-bottom: 1px solid var(--borde); }
+.pasos-lead button {
+  border: 0; background: none; padding: 12px 8px; font: inherit; font-size: 12px; font-weight: 650; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--texto-3); cursor: pointer; border-bottom: 3px solid transparent;
+}
+.pasos-lead button.hecho { color: var(--acento-texto); }
+.pasos-lead button.activo { border-bottom-color: var(--acento); color: var(--acento-texto); background: var(--acento-suave); }
+.ficha-rejilla { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 0.8fr); align-items: start; padding-bottom: 96px; }
+.ficha-izq { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.ficha-der { position: sticky; top: 76px; min-width: 0; }
+.seccion-ficha { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 16px; }
+.seccion-ficha h2 { font-size: 15px; font-weight: 650; padding-left: 12px; border-left: 3px solid var(--acento); }
+.formulario-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.lista-nueva { display: flex; gap: 6px; min-width: 0; }
+.lista-nueva .entrada { flex: 1; }
+.lista-nueva .boton.icono { flex-shrink: 0; width: 36px; height: 36px; font-size: 18px; }
+.guardar-flotante {
+  position: fixed; bottom: 0; left: var(--lateral); right: 0; z-index: 20; display: flex; gap: 10px; align-items: center; justify-content: flex-end;
+  padding: 12px 28px calc(12px + env(safe-area-inset-bottom, 0px)); background: var(--superficie); border-top: 1px solid var(--borde);
+  box-shadow: 0 -8px 24px rgba(23, 33, 28, 0.08); transform: translateY(110%); transition: transform 0.2s;
+}
+.guardar-flotante.visible { transform: none; }
+.guardar-flotante span { margin-right: auto; color: var(--texto-2); font-weight: 550; }
+.pestanas { display: flex; gap: 2px; border-bottom: 1px solid var(--borde); padding: 0 8px; overflow-x: auto; }
+.pestanas button { border: 0; background: none; padding: 12px 12px 10px; font: inherit; font-weight: 550; color: var(--texto-2); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; display: inline-flex; align-items: center; }
+.pestanas button.activo { color: var(--texto); border-bottom-color: var(--acento); }
+.redactor-comentario { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--superficie-2); border-radius: 10px; }
+.zona-subir { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 22px; border: 2px dashed var(--borde); border-radius: 10px; color: var(--texto-2); cursor: pointer; text-align: center; }
+.zona-subir:hover { border-color: var(--acento); color: var(--acento-texto); }
+.lista-plana { display: flex; flex-direction: column; }
+.lista-plana > div { padding: 10px 0; border-bottom: 1px solid var(--borde); }
+.lista-plana > div:last-child { border-bottom: 0; }
+.lista-plana p { margin: 0; }
+.lista-plana small { color: var(--texto-3); display: inline-flex; gap: 4px; align-items: center; }
+.columnas-menu { position: absolute; right: 0; top: 40px; z-index: 30; background: var(--superficie); border: 1px solid var(--borde); border-radius: 10px; box-shadow: var(--sombra-flotante); padding: 10px; width: 280px; max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.columnas-menu label { display: flex; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.columnas-menu label:hover { background: var(--superficie-2); }
+.columnas-menu b { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texto-3); padding: 8px 6px 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px 4px 10px; border-radius: 999px; background: var(--superficie-2); border: 1px solid var(--borde); font-size: 13px; }
+.chip button { border: 0; background: none; cursor: pointer; color: var(--texto-3); display: grid; place-items: center; padding: 2px; border-radius: 50%; }
+.chip button:hover { color: var(--mal); background: var(--mal-suave); }
+@media (max-width: 1100px) {
+  .ficha-rejilla { grid-template-columns: minmax(0, 1fr); }
+  .ficha-der { position: static; }
+  .formulario-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  .guardar-flotante { left: 0; padding-left: 16px; padding-right: 16px; }
+  .formulario-3 { grid-template-columns: minmax(0, 1fr); }
+  .pasos-lead button { font-size: 10.5px; letter-spacing: 0.02em; }
+}
+.celda-select { height: 30px; min-width: 130px; font-size: 12.5px; background: transparent; border-color: transparent; }
+.celda-select:hover { border-color: var(--borde); background: var(--superficie); }
+.celda-etapa { position: relative; display: inline-block; }
+.celda-etapa .celda-select { position: absolute; inset: 0; opacity: 0; min-width: 0; cursor: pointer; }

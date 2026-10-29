@@ -404,3 +404,94 @@ begin
   end loop;
   begin alter publication supabase_realtime add table public.unidades; exception when others then null; end;
 end $$;
+
+-- =====================================================================
+-- Ficha completa del lead + listas desplegables editables. Seguro correrlo otra vez.
+-- =====================================================================
+alter table public.leads
+  add column if not exists tipo_telefono text default 'Celular',
+  add column if not exists tipo_correo text default 'Personal',
+  add column if not exists domicilio text,
+  add column if not exists pais text default 'México',
+  add column if not exists estado_geo text,
+  add column if not exists municipio text,
+  add column if not exists sexo text,
+  add column if not exists estado_civil text,
+  add column if not exists rango_edad text,
+  add column if not exists nacionalidad text,
+  add column if not exists referido text,
+  add column if not exists como_se_entero text,
+  add column if not exists primer_contacto text,
+  add column if not exists fecha_visita date,
+  add column if not exists nivel_interes text,
+  add column if not exists perfil_cliente text,
+  add column if not exists ocupacion text,
+  add column if not exists etapa_vida text,
+  add column if not exists visita_showroom text,
+  add column if not exists tipo_pago text,
+  add column if not exists fecha_nacimiento date,
+  add column if not exists motivo_compra text,
+  add column if not exists anuncio text,
+  add column if not exists conjunto_anuncios text,
+  add column if not exists rango_presupuesto text,
+  add column if not exists ranking text,
+  add column if not exists tiempo_compra text;
+
+alter table public.actividades add column if not exists urgente boolean not null default false;
+alter table public.documentos add column if not exists lead_id uuid references public.leads(id) on delete cascade;
+
+create table if not exists public.tareas (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid references public.leads(id) on delete cascade,
+  titulo text not null,
+  vence timestamptz,
+  hecha boolean not null default false,
+  asignado_a uuid references public.perfiles(id) on delete set null,
+  creado_por uuid references public.perfiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists tareas_lead_idx on public.tareas (lead_id);
+
+-- Opciones de cada lista desplegable (se editan desde el CRM con el botón +)
+create table if not exists public.opciones_campo (
+  id uuid primary key default gen_random_uuid(),
+  campo text not null,
+  valor text not null,
+  orden int not null default 0,
+  unique (campo, valor)
+);
+
+insert into public.opciones_campo (campo, valor, orden)
+select c, v, o from (values
+  ('tipo_telefono','Celular',1),('tipo_telefono','Casa',2),('tipo_telefono','Oficina',3),
+  ('tipo_correo','Personal',1),('tipo_correo','Trabajo',2),
+  ('pais','México',1),('pais','Estados Unidos',2),('pais','Otro',3),
+  ('estado_geo','Nuevo León',1),('estado_geo','Coahuila',2),('estado_geo','Tamaulipas',3),('estado_geo','Ciudad de México',4),('estado_geo','Otro',5),
+  ('municipio','Monterrey',1),('municipio','San Pedro Garza García',2),('municipio','Santa Catarina',3),('municipio','Guadalupe',4),('municipio','San Nicolás',5),('municipio','Apodaca',6),('municipio','Escobedo',7),('municipio','García',8),('municipio','Santiago',9),('municipio','Otro',10),
+  ('sexo','Femenino',1),('sexo','Masculino',2),('sexo','Prefiere no decir',3),
+  ('estado_civil','Soltero(a)',1),('estado_civil','Casado(a)',2),('estado_civil','Unión libre',3),('estado_civil','Divorciado(a)',4),('estado_civil','Viudo(a)',5),
+  ('rango_edad','18-25',1),('rango_edad','26-35',2),('rango_edad','36-45',3),('rango_edad','46-55',4),('rango_edad','56+',5),
+  ('nacionalidad','Mexicana',1),('nacionalidad','Extranjera',2),
+  ('como_se_entero','Facebook',1),('como_se_entero','Instagram',2),('como_se_entero','WhatsApp',3),('como_se_entero','Google',4),('como_se_entero','Página web',5),('como_se_entero','Broker',6),('como_se_entero','Referido',7),('como_se_entero','Espectacular / lona',8),('como_se_entero','Pasaba por el showroom',9),('como_se_entero','Otro',10),
+  ('primer_contacto','WhatsApp',1),('primer_contacto','Llamada',2),('primer_contacto','Formulario',3),('primer_contacto','Showroom',4),('primer_contacto','Correo',5),
+  ('nivel_interes','Bajo',1),('nivel_interes','Medio',2),('nivel_interes','Alto',3),
+  ('perfil_cliente','Comprador final',1),('perfil_cliente','Inversionista',2),('perfil_cliente','Ambos',3),
+  ('etapa_vida','Soltero(a) independiente',1),('etapa_vida','Pareja sin hijos',2),('etapa_vida','Familia con hijos pequeños',3),('etapa_vida','Familia con hijos grandes',4),('etapa_vida','Nido vacío',5),('etapa_vida','Retirado(a)',6),
+  ('visita_showroom','No',1),('visita_showroom','Agendada',2),('visita_showroom','Sí, ya visitó',3),
+  ('tipo_pago','Contado',1),('tipo_pago','Crédito bancario',2),('tipo_pago','Infonavit',3),('tipo_pago','Fovissste',4),('tipo_pago','Cofinavit',5),('tipo_pago','Esquema directo',6),
+  ('motivo_compra','Vivir',1),('motivo_compra','Inversión / renta',2),('motivo_compra','Para un familiar',3),('motivo_compra','Patrimonio',4),
+  ('rango_presupuesto','Menos de $2.5 M',1),('rango_presupuesto','$2.5 M a $3.5 M',2),('rango_presupuesto','$3.5 M a $5 M',3),('rango_presupuesto','$5 M a $7 M',4),('rango_presupuesto','Más de $7 M',5),
+  ('ranking','A',1),('ranking','B',2),('ranking','C',3),('ranking','D',4),
+  ('tiempo_compra','Inmediato',1),('tiempo_compra','1 a 3 meses',2),('tiempo_compra','3 a 6 meses',3),('tiempo_compra','6 a 12 meses',4),('tiempo_compra','Más de un año',5)
+) as t(c, v, o)
+on conflict (campo, valor) do nothing;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['tareas','opciones_campo'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists equipo_todo on public.%I', t);
+    execute format('create policy equipo_todo on public.%I for all to authenticated using (true) with check (true)', t);
+  end loop;
+end $$;

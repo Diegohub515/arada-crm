@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, Columns3, MessageCircle, Handshake, Truck, ClipboardList,
-  Receipt, FolderOpen, Settings, LogOut, Menu, Bot, Building2, FileText, BadgeDollarSign,
+  Receipt, FolderOpen, Settings, LogOut, Menu, Bot, Building2, FileText, BadgeDollarSign, ListChecks,
 } from "lucide-react";
 import { supabaseNavegador } from "@/lib/supabase/client";
 import { iniciales } from "@/lib/formato";
@@ -98,6 +98,9 @@ export default function Marco({ children }: { children: React.ReactNode }) {
             <nav className="menu">
               <Link href="/configuracion" className={activo("/configuracion") ? "activo" : ""}>
                 <Settings size={17} strokeWidth={1.8} /> Conexiones
+              </Link>
+              <Link href="/listas" className={activo("/listas") ? "activo" : ""}>
+                <ListChecks size={17} strokeWidth={1.8} /> Listas desplegables
               </Link>
               <a href="#" onClick={(e) => { e.preventDefault(); salir(); }}>
                 <LogOut size={17} strokeWidth={1.8} /> Cerrar sesión
