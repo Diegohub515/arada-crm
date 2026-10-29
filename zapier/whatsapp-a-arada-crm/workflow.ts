@@ -131,7 +131,8 @@ export default defineDurable<Input>("whatsapp-a-arada-crm", async (ctx, rawInput
   const pathA = r.includes("transferir_asesor");
   const pathC = r.includes("enviar_brochure_roma");
   const pathD = r.includes("enviar_brochure_santa_catarina");
-  const pathB = !pathA && !pathC && !pathD;
+  const pathE = !pathA && r.includes("enviar_precios_roma");
+  const pathB = !pathA && !pathC && !pathD && !pathE;
 
   if (pathA) {
     const aviso = "¡Gracias por tu mensaje! 😊 En un momento un asesor de Vivia Roma se pondrá en contacto contigo.";
@@ -188,6 +189,26 @@ export default defineDurable<Input>("whatsapp-a-arada-crm", async (ctx, rawInput
     await registrar("registrar-respuesta-en-crm", { mensaje: `${parte1}\n\n${parte2}`, direccion: "saliente", autor: "bot", ...conNombre });
   }
 
+  if (pathE) {
+    const texto = "Aquí tienes nuestra lista de precios de Vivia Roma 🏡 Además, hoy tenemos descuento de hasta $300,000. ¿Cuál tipología te late más?";
+    await ctx.step("send-price-list-roma", async () =>
+      sdk.runAction({
+        app: "whatsapp-business",
+        actionType: "write",
+        action: "send_media_message",
+        connection: "whatsapp_business_connection",
+        inputs: {
+          recipient: input.from,
+          media_type: "image",
+          file_url: "https://arada-crm.vercel.app/bot/lista-precios-vro-2026-10.jpg",
+          caption: texto,
+          filename: "",
+        },
+      }),
+    );
+    await registrar("registrar-precios-en-crm", { mensaje: `[Se envió la lista de precios de Vivia Roma]\n${texto}`, direccion: "saliente", autor: "bot", ...conNombre });
+  }
+
   if (pathC) {
     await ctx.step("Send Media Message in App228834", async () =>
       sdk.runAction({
@@ -198,8 +219,7 @@ export default defineDurable<Input>("whatsapp-a-arada-crm", async (ctx, rawInput
         inputs: {
           recipient: input.from,
           media_type: "image",
-          file_url:
-            "https://dl.dropboxusercontent.com/scl/fi/dn0zrg8tse1qw63xqipyx/One-Page-Digital_page-0001-1.jpg?rlkey=gf49y360c3e8t7kvpg3hdr4jq&st=4b7m780v&raw=1",
+          file_url: "https://arada-crm.vercel.app/bot/brochure-vro.jpg",
           caption: "¡Aquí tienes el brochure de Vivia Roma! 😊 ​",
           filename: "",
         },
