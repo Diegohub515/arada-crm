@@ -106,7 +106,8 @@ Reglas para las lecciones:
 - Toma muy en cuenta los 👍/👎 y correcciones de los asesores, y lo que hacen los asesores que sí logran citas.
 - NUNCA inventes precios, descuentos, fechas o datos del proyecto: un "dato" solo vale si un ASESOR lo dijo en los chats.
 - El bot nunca debe decir que es una persona: si preguntan, es el asistente virtual.
-- No repitas lecciones que ya existen (te las paso abajo). Máximo 8 lecciones, solo las que de verdad valgan la pena; si no hay nada nuevo, devuelve pocas o ninguna.`;
+- No repitas lecciones que ya existen (te las paso abajo). Máximo 8 lecciones, solo las que de verdad valgan la pena; si no hay nada nuevo, devuelve pocas o ninguna.
+Entrega tu resultado SIEMPRE llamando a la herramienta "reportar" (no escribas el reporte como texto).`;
 
   const usuario = `MÉTRICAS DEL PERIODO (${dias} días): ${JSON.stringify(metricas)}
 
@@ -149,14 +150,22 @@ ${texto}`;
           required: ["resumen", "lecciones"],
         },
       }],
-      tool_choice: { type: "tool", name: "reportar" },
+      // Algunos modelos no aceptan forzar la herramienta: se pide en las instrucciones
+      tool_choice: { type: "auto" },
       messages: [{ role: "user", content: usuario }],
     }),
   });
   const datos = await r.json();
   if (!r.ok) return NextResponse.json({ error: datos?.error?.message ?? `La IA respondió ${r.status}` }, { status: 502 });
-  const salida = (datos.content ?? []).find((b: any) => b.type === "tool_use")?.input as
-    { resumen: string; lecciones: { texto: string; categoria: string; evidencia: string }[] } | undefined;
+  type Reporte = { resumen: string; lecciones: { texto: string; categoria: string; evidencia: string }[] };
+  let salida = (datos.content ?? []).find((b: any) => b.type === "tool_use")?.input as Reporte | undefined;
+  if (!salida) {
+    // Por si el modelo contestó en texto: se busca el JSON dentro
+    const texto = (datos.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n");
+    const json = texto.match(/\{[\s\S]*\}/)?.[0];
+    try { if (json) salida = JSON.parse(json); } catch { /* sin JSON válido */ }
+    if (!salida && texto.trim()) salida = { resumen: texto.trim().slice(0, 3000), lecciones: [] };
+  }
   if (!salida) return NextResponse.json({ error: "La IA no devolvió el análisis" }, { status: 502 });
 
   const { data: analisis } = await db.from("agente_analisis").insert({

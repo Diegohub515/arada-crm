@@ -261,6 +261,7 @@ export async function generarRespuesta(p: {
   const { config, turnos, lead } = p;
   const ahora = new Date().toLocaleString("es-MX", { timeZone: "America/Monterrey", dateStyle: "full", timeStyle: "short" });
   const sistema = `${REGLAS_BASE}
+Contesta SIEMPRE llamando a la herramienta "responder" (nunca escribas la respuesta como texto suelto).
 
 Tu nombre: ${config.nombre}.
 Fecha y hora actual en Monterrey: ${ahora}.
@@ -281,14 +282,17 @@ ${lead ? JSON.stringify({ nombre: lead.nombre, etapa: lead.etapa, tipologia: lea
       max_tokens: 800,
       system: sistema,
       tools: [HERRAMIENTA],
-      tool_choice: { type: "tool", name: "responder" },
+      tool_choice: { type: "auto" },
       messages: turnos,
     }),
   });
   const datos = await r.json();
   if (!r.ok) throw new Error(datos?.error?.message ?? `La IA respondió ${r.status}`);
   const bloque = (datos.content ?? []).find((b: any) => b.type === "tool_use");
-  return (bloque?.input as Salida) ?? null;
+  if (bloque?.input) return bloque.input as Salida;
+  // Si el modelo contestó en texto en lugar de usar la herramienta, se usa ese texto como respuesta
+  const texto = (datos.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim();
+  return texto ? { mensaje: texto, temperatura: "tibio", pasar_a_humano: false } as Salida : null;
 }
 
 export type { Salida };
