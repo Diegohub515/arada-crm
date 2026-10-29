@@ -2,7 +2,8 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Bot, Search, Send, Sparkles, UserRound } from "lucide-react";
+import { ArrowLeft, Bot, MessageSquarePlus, Search, Send, Sparkles, UserRound } from "lucide-react";
+import { EnviarPlantilla, NuevoChat } from "@/components/IniciarChat";
 import { Barra } from "@/components/Marco";
 import { FichaLead, PastillaEtapa } from "@/components/leads";
 import { IconoRed } from "@/components/ui";
@@ -35,6 +36,7 @@ function Bandeja() {
   const [filtro, setFiltro] = useState("todas");
   const [leadsForm, setLeadsForm] = useState<{ id: string; nombre: string; telefono: string | null; origen: string; campana: string | null; etapa: string; created_at: string }[] | null>(null);
   const esLeads = filtro in ORIGENES_FILTRO;
+  const [iniciar, setIniciar] = useState<{ id: string; nombre: string; telefono: string | null } | "nuevo" | null>(null);
 
   useEffect(() => {
     if (!esLeads) return;
@@ -74,7 +76,9 @@ function Bandeja() {
 
   return (
     <>
-      <Barra titulo="Bandeja" />
+      <Barra titulo="Bandeja">
+        <button className="boton primario" onClick={() => setIniciar("nuevo")}><MessageSquarePlus size={16} /> Nuevo chat</button>
+      </Barra>
       <div className={`bandeja ${activa ? "con-chat" : ""}`}>
         <aside className="bandeja-lista">
           <div className="herramientas" style={{ flexDirection: "column", alignItems: "stretch" }}>
@@ -91,7 +95,7 @@ function Bandeja() {
           <div className="chats">
             {error && <div className="error-caja" style={{ margin: 12 }}>{error}</div>}
             {esLeads && (leadsForm ?? []).filter((l) => !q.trim() || `${l.nombre} ${l.telefono ?? ""} ${l.campana ?? ""}`.toLowerCase().includes(q.trim().toLowerCase())).map((l) => (
-              <button key={l.id} className="chat-item" onClick={() => router.push(`/leads/${l.id}`)}>
+              <button key={l.id} className="chat-item" onClick={() => setIniciar({ id: l.id, nombre: l.nombre, telefono: l.telefono })} title="Escribirle por WhatsApp">
                 <span className="avatar">{iniciales(l.nombre)}</span>
                 <div>
                   <div className="arriba"><b>{l.nombre}</b><small>{relativo(l.created_at)}</small></div>
@@ -135,6 +139,10 @@ function Bandeja() {
           </section>
         )}
       </div>
+      {iniciar && (
+        <NuevoChat lead={iniciar === "nuevo" ? null : iniciar} onCerrar={() => setIniciar(null)}
+          onListo={(convId) => { setIniciar(null); setFiltro("todas"); cargar(); if (convId) abrir(convId); }} />
+      )}
     </>
   );
 }
@@ -318,6 +326,11 @@ function Chat({ conv, onVolver }: { conv: ConvConLead; onVolver: () => void }) {
           {ventanaCerrada
             ? "Pasaron más de 24 h desde el último mensaje del cliente: WhatsApp solo permite mandarle una plantilla aprobada (como las de RMKT)."
             : `Puedes contestarle por WhatsApp ${horasRestantes > 0 ? `durante ${horasRestantes} h más` : "por menos de 1 h más"}. Al contestar tú, el bot se pausa en este chat.`}
+        </div>
+      )}
+      {porZapier && conv.leads && (ventanaCerrada || mensajes.length === 0) && (
+        <div className="tarjeta" style={{ margin: "0 14px 12px", padding: 12 }}>
+          <EnviarPlantilla leadId={conv.leads.id} compacto onEnviado={() => cargar()} />
         </div>
       )}
       {!puedeEscribir ? (
