@@ -139,8 +139,8 @@ export default function Inventario() {
           </div>
         </div>
 
-        <div className="rejilla rejilla-4">
-          {ESTADOS_UNIDAD.slice(0, 3).map((e) => (
+        <div className="rejilla rejilla-kpi">
+          {ESTADOS_UNIDAD.map((e) => (
             <button key={e.id} className={`tarjeta kpi filtro-kpi ${filtroEstado === e.id ? "activo" : ""}`} onClick={() => setFiltroEstado(filtroEstado === e.id ? "todos" : e.id)}>
               <div className="kpi-titulo"><span className={`punto ${e.tono}`} />{e.nombre}s</div>
               <div className="kpi-fila"><span className="kpi-valor">{cuenta(e.id)}</span><span className="kpi-nota">de {total}</span></div>
@@ -148,7 +148,7 @@ export default function Inventario() {
           ))}
           <div className="tarjeta kpi">
             <div className="kpi-titulo">Avance comercial</div>
-            <div className="kpi-fila"><span className="kpi-valor">{vendidoPct}%</span><span className="kpi-nota">{dineroCorto(valorDisp)} por vender</span></div>
+            <div className="kpi-fila"><span className="kpi-valor">{vendidoPct}%</span><span className="kpi-nota">{total} deptos · {dineroCorto(valorDisp)} por vender</span></div>
             <div className="pista"><div className="relleno" style={{ width: `${vendidoPct}%` }} /></div>
           </div>
         </div>
