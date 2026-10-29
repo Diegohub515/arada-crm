@@ -1,5 +1,6 @@
 /* Arada CRM — interfaz clara tipo panel, acento violeta */
 :root {
+  color-scheme: light;
   --fondo: #f7f9f8;
   --superficie: #ffffff;
   --superficie-2: #eff4f1;
@@ -25,8 +26,7 @@
   --lateral: 248px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+:root[data-tema="oscuro"] {
     --fondo: #0f1411;
     --superficie: #161d19;
     --superficie-2: #1f2823;
@@ -48,7 +48,6 @@
     --sombra: 0 1px 2px rgba(0, 0, 0, 0.3);
     --sombra-flotante: 0 18px 50px rgba(0, 0, 0, 0.55);
     color-scheme: dark;
-  }
 }
 
 * { box-sizing: border-box; }

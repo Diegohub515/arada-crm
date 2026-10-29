@@ -11,7 +11,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es-MX" className={fuente.variable}>
+    <html lang="es-MX" className={fuente.variable} suppressHydrationWarning>
+      <head>
+        {/* Aplica el tema guardado antes de pintar, para que no parpadee */}
+        <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("arada-tema")==="oscuro")document.documentElement.dataset.tema="oscuro"}catch(e){}` }} />
+      </head>
       <body>{children}</body>
     </html>
   );

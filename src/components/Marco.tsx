@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, Columns3, MessageCircle, Handshake, Truck, ClipboardList,
-  Receipt, FolderOpen, Settings, LogOut, Menu, Bot, Building2, FileText, BadgeDollarSign, ListChecks,
+  Receipt, FolderOpen, Settings, LogOut, Menu, Bot, Building2, FileText, BadgeDollarSign, ListChecks, Moon, Sun,
 } from "lucide-react";
 import { supabaseNavegador } from "@/lib/supabase/client";
 import { iniciales } from "@/lib/formato";
@@ -48,6 +48,16 @@ export default function Marco({ children }: { children: React.ReactNode }) {
   const [abierto, setAbierto] = useState(false);
   const [email, setEmail] = useState<string>("");
   const [noLeidos, setNoLeidos] = useState(0);
+  const [tema, setTema] = useState<"claro" | "oscuro">("claro");
+  useEffect(() => {
+    try { if (localStorage.getItem("arada-tema") === "oscuro") setTema("oscuro"); } catch { /* sin almacenamiento */ }
+  }, []);
+  function cambiarTema() {
+    const nuevo = tema === "claro" ? "oscuro" : "claro";
+    setTema(nuevo);
+    document.documentElement.dataset.tema = nuevo;
+    try { localStorage.setItem("arada-tema", nuevo); } catch { /* sin almacenamiento */ }
+  }
 
   useEffect(() => {
     const db = supabaseNavegador();
@@ -102,6 +112,9 @@ export default function Marco({ children }: { children: React.ReactNode }) {
               <Link href="/listas" className={activo("/listas") ? "activo" : ""}>
                 <ListChecks size={17} strokeWidth={1.8} /> Listas desplegables
               </Link>
+              <a href="#" onClick={(e) => { e.preventDefault(); cambiarTema(); }}>
+                {tema === "claro" ? <Moon size={17} strokeWidth={1.8} /> : <Sun size={17} strokeWidth={1.8} />} {tema === "claro" ? "Modo oscuro" : "Modo claro"}
+              </a>
               <a href="#" onClick={(e) => { e.preventDefault(); salir(); }}>
                 <LogOut size={17} strokeWidth={1.8} /> Cerrar sesión
               </a>
