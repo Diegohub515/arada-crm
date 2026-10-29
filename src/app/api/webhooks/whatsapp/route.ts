@@ -51,6 +51,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  // Zapier avisa cómo le fue a un envío de remarketing (plantillas)
+  if (p.accion === "resultado_campana") {
+    const db = supabaseAdmin();
+    const resultados: { envio_id: string; ok: boolean; detalle?: string }[] = Array.isArray(p.resultados) ? p.resultados : [];
+    const malos = resultados.filter((r) => !r.ok);
+    const buenos = resultados.filter((r) => r.ok).map((r) => r.envio_id);
+    if (buenos.length) await db.from("campana_envios").update({ estado: "enviado" }).in("id", buenos);
+    for (const m of malos) {
+      await db.from("campana_envios").update({ estado: "error", detalle: m.detalle ?? null }).eq("id", m.envio_id);
+      await db.from("mensajes").update({ estado: "error" }).eq("zernio_message_id", `camp:${m.envio_id}`);
+    }
+    if (p.campana_id) {
+      const { count: enviados } = await db.from("campana_envios").select("id", { count: "exact", head: true }).eq("campana_id", p.campana_id).eq("estado", "enviado");
+      const { count: errores } = await db.from("campana_envios").select("id", { count: "exact", head: true }).eq("campana_id", p.campana_id).eq("estado", "error");
+      await db.from("campanas_wa").update({ enviados: enviados ?? 0, errores: errores ?? 0 }).eq("id", p.campana_id);
+    }
+    return NextResponse.json({ ok: true });
+  }
+
   const telefono = normalizarTelefono(p.telefono ?? p.phone ?? p.from ?? p.wa_id);
   const texto = String(p.mensaje ?? p.message ?? p.text ?? p.body ?? "").trim();
   const nombre = String(p.nombre ?? p.name ?? p.profile_name ?? "").trim() || null;

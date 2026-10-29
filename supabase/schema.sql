@@ -495,3 +495,59 @@ begin
     execute format('create policy equipo_todo on public.%I for all to authenticated using (true) with check (true)', t);
   end loop;
 end $$;
+
+-- =====================================================================
+-- Remarketing por WhatsApp: plantillas aprobadas en Meta y envíos en lote
+-- (se mandan por la automatización de Zapier "crm-plantillas-whatsapp")
+-- =====================================================================
+create table if not exists public.plantillas (
+  id uuid primary key default gen_random_uuid(),
+  nombre text not null,                 -- nombre exacto en Meta, ej. descuentos_vro
+  idioma text not null default 'es_MX', -- código de idioma en Meta
+  titulo text,                          -- nombre amigable en el CRM
+  texto text,                           -- copia del texto para la vista previa
+  imagen_path text,                     -- imagen del encabezado (bucket archivos)
+  desarrollo text,
+  activa boolean not null default true,
+  created_at timestamptz not null default now(),
+  unique (nombre, idioma)
+);
+
+insert into public.plantillas (nombre, idioma, titulo, desarrollo)
+values ('descuentos_vro', 'es_MX', 'Descuentos Vivia Roma', 'VRO'),
+       ('vsc_whatsapp', 'es_MX', 'Locales Vivia Santa Catarina', 'VSC')
+on conflict (nombre, idioma) do nothing;
+
+create table if not exists public.campanas_wa (
+  id uuid primary key default gen_random_uuid(),
+  nombre text not null,
+  plantilla_id uuid references public.plantillas(id) on delete set null,
+  filtros jsonb,
+  total int not null default 0,
+  enviados int not null default 0,
+  errores int not null default 0,
+  creado_por uuid references public.perfiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.campana_envios (
+  id uuid primary key default gen_random_uuid(),
+  campana_id uuid not null references public.campanas_wa(id) on delete cascade,
+  lead_id uuid references public.leads(id) on delete cascade,
+  telefono text not null,
+  estado text not null default 'pendiente', -- pendiente | enviado | error
+  detalle text,
+  created_at timestamptz not null default now(),
+  unique (campana_id, lead_id)
+);
+create index if not exists campana_envios_lead_idx on public.campana_envios (lead_id);
+
+do $$
+declare t text;
+begin
+  foreach t in array array['plantillas','campanas_wa','campana_envios'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists equipo_todo on public.%I', t);
+    execute format('create policy equipo_todo on public.%I for all to authenticated using (true) with check (true)', t);
+  end loop;
+end $$;
