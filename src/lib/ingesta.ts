@@ -19,6 +19,8 @@ export async function guardarLead(
     notas?: string | null;
     externalId?: string | null;
     originales?: unknown;
+    /** Otros campos de la ficha (anuncio, conjunto_anuncios, como_se_entero, etc.) */
+    extra?: Record<string, unknown>;
   }
 ): Promise<{ id: string; nuevo: boolean }> {
   const telefono = normalizarTelefono(datos.telefono);
@@ -41,7 +43,15 @@ export async function guardarLead(
     existente = data;
   }
 
+  const extra = Object.fromEntries(Object.entries(datos.extra ?? {}).filter(([, v]) => v != null && v !== ""));
+
   if (existente) {
+    // Completa solo los campos que estaban vacíos (no pisa lo que ya capturó el equipo)
+    if (Object.keys(extra).length) {
+      const { data: actual } = await db.from("leads").select("*").eq("id", existente.id).single();
+      const vacios = Object.fromEntries(Object.entries(extra).filter(([k]) => actual && (actual as any)[k] == null));
+      if (Object.keys(vacios).length) await db.from("leads").update(vacios).eq("id", existente.id);
+    }
     await db.from("actividades").insert({
       lead_id: existente.id,
       tipo: "sistema",
@@ -64,6 +74,7 @@ export async function guardarLead(
       notas: datos.notas || null,
       external_id: datos.externalId || null,
       datos_originales: datos.originales ?? null,
+      ...extra,
     })
     .select("id")
     .single();

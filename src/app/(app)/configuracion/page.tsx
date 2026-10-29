@@ -78,6 +78,23 @@ export default async function Configuracion() {
         </div>
 
         <div className="tarjeta">
+          <div className="tarjeta-cabeza"><h2>WhatsApp por Zapier (sin mudar el número)</h2></div>
+          <div className="tarjeta-cuerpo" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <ol className="pasos">
+              <li>En tu Zap que recibe los WhatsApp, agrega <b>Webhooks by Zapier → POST</b> (Payload Type: json) a esta URL:</li>
+            </ol>
+            <div className="codigo">{base}/api/webhooks/whatsapp?token=TU_LEADS_WEBHOOK_TOKEN</div>
+            <ol className="pasos" start={2}>
+              <li>Campos: <b>telefono</b> (número del cliente), <b>nombre</b> (nombre del perfil), <b>mensaje</b> (texto) y, si lo tienes, <b>mensaje_id</b>.</li>
+              <li>Agrega un <b>Filtro</b>: continuar solo si <b>responder</b> es <b>true</b>.</li>
+              <li>Después, la acción de WhatsApp que envía el mensaje, usando <b>respuesta</b> como texto.</li>
+              <li>Apaga el bot anterior para que el cliente no reciba dos respuestas.</li>
+            </ol>
+            <small style={{ color: "var(--texto-3)" }}>El prompt del agente se edita en Agente IA. El chat queda guardado en la Bandeja y el lead se crea solo.</small>
+          </div>
+        </div>
+
+        <div className="tarjeta">
           <div className="tarjeta-cabeza"><h2>4. Tu equipo</h2></div>
           <div className="tarjeta-cuerpo">
             <ol className="pasos">

@@ -51,7 +51,8 @@ export async function POST(req: Request) {
         telefono: buscarCampo(mapa, "PHONE_NUMBER", "Número de teléfono", "telefono"),
         email: buscarCampo(mapa, "EMAIL", "Correo electrónico"),
         origen: "google_ads",
-        campana: p.campaign_id ? `Campaña ${p.campaign_id}` : null,
+        campana: p.campaign_name ?? (p.campaign_id ? `Campaña ${p.campaign_id}` : null),
+        extra: { como_se_entero: "Google", primer_contacto: "Formulario", conjunto_anuncios: p.adgroup_name ?? null },
         notas: Object.entries(mapa).map(([k, v]) => `${k}: ${v}`).join("\n"),
         externalId: p.lead_id ? `google:${p.lead_id}` : null,
         originales: p,
@@ -77,6 +78,15 @@ export async function POST(req: Request) {
       notas: buscarCampo(plano, "notas", "mensaje", "message", "comentarios"),
       externalId: (plano.lead_id || plano.id) ? `ext:${plano.lead_id || plano.id}` : null,
       originales: p,
+      extra: {
+        conjunto_anuncios: buscarCampo(plano, "conjunto_anuncios", "adset_name", "ad_set_name"),
+        anuncio: plano.anuncio || plano.ad_name || null,
+        como_se_entero: buscarCampo(plano, "como_se_entero") ?? COMO_SE_ENTERO[origenValido(buscarCampo(plano, "origen", "source")) ?? "landing"] ?? null,
+        primer_contacto: buscarCampo(plano, "primer_contacto") ?? (origenValido(buscarCampo(plano, "origen", "source")) === "whatsapp" ? "WhatsApp" : "Formulario"),
+        rango_presupuesto: buscarCampo(plano, "rango_presupuesto"),
+        tiempo_compra: buscarCampo(plano, "tiempo_compra", "cuando_compra"),
+        motivo_compra: buscarCampo(plano, "motivo_compra", "proposito"),
+      },
     });
     return NextResponse.json({ ok: true, ...r });
   } catch (e: any) {
@@ -91,6 +101,11 @@ function tokenValido(t: unknown) {
   const a = Buffer.from(t), b = Buffer.from(esperado);
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
+
+const COMO_SE_ENTERO: Record<string, string> = {
+  meta_formulario: "Facebook", facebook: "Facebook", instagram: "Instagram", whatsapp: "WhatsApp",
+  google_ads: "Google", landing: "Página web", broker: "Broker", referido: "Referido",
+};
 
 const ORIGENES = ["meta_formulario", "whatsapp", "instagram", "facebook", "google_ads", "landing", "broker", "referido", "manual", "otro"];
 function origenValido(o: string | null) {

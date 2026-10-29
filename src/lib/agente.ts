@@ -98,19 +98,8 @@ export async function ejecutarAgente(db: SupabaseClient, conversacionId: string,
     conv.lead_id ? db.from("leads").select("*").eq("id", conv.lead_id).single() : Promise.resolve({ data: null }),
   ]);
 
-  const historial = (msgs ?? []).reverse().map((m) => ({
-    role: m.direccion === "entrante" ? ("user" as const) : ("assistant" as const),
-    content: m.texto || "(archivo adjunto)",
-  }));
-  // La API exige alternar turnos y empezar con el cliente: juntamos mensajes seguidos del mismo lado.
-  const turnos: { role: "user" | "assistant"; content: string }[] = [];
-  for (const h of historial) {
-    const prev = turnos[turnos.length - 1];
-    if (prev && prev.role === h.role) prev.content += "\n" + h.content;
-    else turnos.push({ ...h });
-  }
-  while (turnos.length && turnos[0].role !== "user") turnos.shift();
-  if (!turnos.length || turnos[turnos.length - 1].role !== "user") return;
+  const turnos = armarTurnos(msgs ?? []);
+  if (!turnos) return;
 
   const salida = await generarRespuesta({ config, turnos, lead, plataforma: conv.plataforma });
   if (!salida?.mensaje?.trim()) return;
@@ -147,7 +136,29 @@ export async function ejecutarAgente(db: SupabaseClient, conversacionId: string,
   );
   await db.from("conversaciones").update({ ultimo_mensaje: texto, ultimo_mensaje_at: ahoraISO, no_leidos: 0 }).eq("id", conversacionId);
 
-  // 5. Actualizar el lead con lo aprendido
+  await aplicarSalida(db, conversacionId, lead, salida);
+}
+
+/** Junta el historial en turnos alternados cliente/asistente, como lo pide la API. */
+function armarTurnos(msgs: { direccion: string; texto: string | null }[]) {
+  const historial = [...msgs].reverse().map((m) => ({
+    role: m.direccion === "entrante" ? ("user" as const) : ("assistant" as const),
+    content: m.texto || "(archivo adjunto)",
+  }));
+  const turnos: { role: "user" | "assistant"; content: string }[] = [];
+  for (const h of historial) {
+    const prev = turnos[turnos.length - 1];
+    if (prev && prev.role === h.role) prev.content += "\n" + h.content;
+    else turnos.push({ ...h });
+  }
+  while (turnos.length && turnos[0].role !== "user") turnos.shift();
+  if (!turnos.length || turnos[turnos.length - 1].role !== "user") return null;
+  return turnos;
+}
+
+/** Guarda en la ficha lo que el agente aprendió y, si aplica, pasa el chat a una persona. */
+async function aplicarSalida(db: SupabaseClient, conversacionId: string, lead: any, salida: Salida) {
+  // Actualizar el lead con lo aprendido
   if (lead) {
     const d = salida.datos ?? {};
     const cambios: Record<string, unknown> = {};
@@ -175,7 +186,7 @@ export async function ejecutarAgente(db: SupabaseClient, conversacionId: string,
     if (Object.keys(cambios).length) await db.from("leads").update(cambios).eq("id", lead.id);
   }
 
-  // 6. Pasar a una persona
+  // Pasar a una persona
   if (salida.pasar_a_humano || salida.cita?.fecha) {
     const motivo = salida.cita?.fecha ? "Cita agendada" : salida.motivo || "El agente necesita apoyo";
     await db.from("conversaciones").update({ agente_activo: false, agente_motivo: motivo }).eq("id", conversacionId);
@@ -185,6 +196,33 @@ export async function ejecutarAgente(db: SupabaseClient, conversacionId: string,
       });
     }
   }
+}
+
+/**
+ * Versión para Zapier (WhatsApp sin Zernio): genera la respuesta, la guarda y la regresa
+ * para que Zapier la envíe. Devuelve null si el agente no debe contestar.
+ */
+export async function responderParaZapier(db: SupabaseClient, conversacionId: string): Promise<string | null> {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  const [{ data: config }, { data: conv }] = await Promise.all([
+    db.from("agente_config").select("*").eq("id", 1).maybeSingle(),
+    db.from("conversaciones").select("*").eq("id", conversacionId).single(),
+  ]);
+  if (!config?.activo || !conv?.agente_activo) return null;
+  const [{ data: msgs }, { data: lead }] = await Promise.all([
+    db.from("mensajes").select("direccion, texto").eq("conversacion_id", conversacionId).order("created_at", { ascending: false }).limit(30),
+    conv.lead_id ? db.from("leads").select("*").eq("id", conv.lead_id).single() : Promise.resolve({ data: null }),
+  ]);
+  const turnos = armarTurnos(msgs ?? []);
+  if (!turnos) return null;
+  const salida = await generarRespuesta({ config, turnos, lead, plataforma: "whatsapp" });
+  const texto = salida?.mensaje?.trim();
+  if (!salida || !texto) return null;
+  const ahora = new Date().toISOString();
+  await db.from("mensajes").insert({ conversacion_id: conversacionId, direccion: "saliente", texto, estado: "enviado", autor: "agente", created_at: ahora });
+  await db.from("conversaciones").update({ ultimo_mensaje: texto, ultimo_mensaje_at: ahora, no_leidos: 0 }).eq("id", conversacionId);
+  await aplicarSalida(db, conversacionId, lead, salida);
+  return texto;
 }
 
 /**

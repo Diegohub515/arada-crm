@@ -227,6 +227,11 @@ function Chat({ conv, onVolver }: { conv: ConvConLead; onVolver: () => void }) {
         </div>
       )}
       {error && <div className="error-caja" style={{ margin: "0 14px 8px" }}>{error}</div>}
+      {!conv.zernio_account_id ? (
+        <div className="aviso-caja" style={{ margin: "0 14px 12px" }}>
+          Este chat entra por Zapier: el agente IA contesta solo; si lo atiendes tú, contesta desde WhatsApp. Para contestar desde aquí hay que conectar el número a Zernio.
+        </div>
+      ) : (
       <div className="redactor">
         <button className="boton icono" onClick={sugerir} disabled={sugiriendo} title="Sugerir respuesta con IA" aria-label="Sugerir respuesta con IA">
           <Sparkles size={16} />
@@ -244,6 +249,7 @@ function Chat({ conv, onVolver }: { conv: ConvConLead; onVolver: () => void }) {
           <Send size={15} /> {enviando ? "Enviando…" : "Enviar"}
         </button>
       </div>
+      )}
       {ficha && conv.leads && <FichaLead id={conv.leads.id} onCerrar={() => setFicha(false)} />}
     </section>
   );
