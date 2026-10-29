@@ -44,7 +44,7 @@ export default async function ImprimirCotizacion({ params }: { params: Promise<{
       `}</style>
       <div className="no-imprimir" style={{ display: "flex", justifyContent: "flex-end" }}><BotonImprimir /></div>
       <div className="hoja-cab">
-        <div className="marca"><div className="marca-logo">A</div><div><b>{des}</b><small>Arada · Preventa</small></div></div>
+        <div className="marca"><img className="marca-logo" src="/logo.png" alt="Arada" /><div><b>{des}</b><small>Arada · Preventa</small></div></div>
         <div style={{ textAlign: "right" }}>
           <h1>Cotización</h1>
           <div className="gris">{c.folio} · {fecha(c.created_at)}</div>

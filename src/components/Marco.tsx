@@ -79,7 +79,7 @@ export default function Marco({ children }: { children: React.ReactNode }) {
       <div className="app">
         <aside className={`lateral ${abierto ? "abierto" : ""}`}>
           <div className="marca">
-            <div className="marca-logo">A</div>
+            <img className="marca-logo" src="/logo.png" alt="Arada" />
             <div><b>Arada CRM</b><small>Preventa · Monterrey</small></div>
           </div>
           {SECCIONES.map((s) => (

@@ -25,7 +25,7 @@ export default function Login() {
     <main className="login">
       <form className="tarjeta" onSubmit={entrar}>
         <div className="marca">
-          <div className="marca-logo">A</div>
+          <img className="marca-logo" src="/logo.png" alt="Arada" />
           <div><b>Arada CRM</b><small>Vivia Roma · Vivia Santa Catarina</small></div>
         </div>
         <div>
