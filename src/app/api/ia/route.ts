@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseServidor } from "@/lib/supabase/server";
+import { generarRespuesta } from "@/lib/agente";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -31,7 +32,8 @@ export async function POST(req: Request) {
   const { data: auth } = await db.auth.getUser();
   if (!auth.user) return NextResponse.json({ error: "Inicia sesión" }, { status: 401 });
 
-  const { accion, id } = (await req.json().catch(() => ({}))) as { accion?: string; id?: string };
+  const cuerpo = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const { accion, id } = cuerpo as { accion?: string; id?: string };
 
   try {
     if (accion === "respuesta" && id) {
@@ -83,6 +85,16 @@ Si los datos son pocos, dilo y explica qué conviene registrar. Usa títulos cor
         JSON.stringify({ ordenes, facturas, leads_por_origen_y_etapa: leads })
       );
       return NextResponse.json({ texto });
+    }
+
+    if (accion === "probar_agente") {
+      const { turnos, config } = cuerpo as {
+        turnos?: { role: "user" | "assistant"; content: string }[];
+        config?: { nombre: string; instrucciones: string; horario_showroom: string | null };
+      };
+      if (!turnos?.length || !config) return NextResponse.json({ error: "Escribe un mensaje de prueba" }, { status: 400 });
+      const salida = await generarRespuesta({ config, turnos, lead: null, plataforma: "whatsapp" });
+      return NextResponse.json({ salida });
     }
 
     return NextResponse.json({ error: "Acción no reconocida" }, { status: 400 });

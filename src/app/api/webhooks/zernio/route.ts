@@ -1,10 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { firmaValida, leerEventoLead, leerEventoMensaje } from "@/lib/zernio";
 import { buscarCampo, guardarLead, origenDePlataforma } from "@/lib/ingesta";
+import { ejecutarAgente, revisarRespuestaExterna } from "@/lib/agente";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // el agente corre después de contestarle a Zernio
 
 /**
  * Recibe los eventos de Zernio:
@@ -93,17 +95,27 @@ async function procesarMensaje(db: ReturnType<typeof supabaseAdmin>, p: any, dir
   }
 
   // 3. Mensaje
-  const { error: errMsg } = await db.from("mensajes").insert({
+  const { data: fila, error: errMsg } = await db.from("mensajes").insert({
     conversacion_id: conversacionId,
     zernio_message_id: m.messageId,
     direccion,
     texto: m.texto,
     adjuntos: m.adjuntos,
     estado: direccion === "entrante" ? "recibido" : "enviado",
+    autor: direccion === "entrante" ? "cliente" : "humano",
     created_at: m.fecha,
-  });
+  }).select("id").single();
   // 23505 = ya lo teníamos (p. ej. lo enviamos desde el CRM y Zernio confirma con message.sent)
   if (errMsg && errMsg.code !== "23505") throw errMsg;
+
+  // 4. Agente de IA: contesta después de responderle OK a Zernio (Zernio solo espera 5 s).
+  if (fila && direccion === "entrante") {
+    after(() => ejecutarAgente(db, conversacionId!, fila.id).catch((e) => console.error("Agente IA:", e)));
+  }
+  // Si alguien contestó desde el celular o desde Zernio, el agente se hace a un lado en ese chat.
+  if (fila && direccion === "saliente") {
+    after(() => revisarRespuestaExterna(db, fila.id, conversacionId!, m.texto).catch(() => {}));
+  }
 
   await db
     .from("conversaciones")

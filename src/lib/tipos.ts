@@ -45,6 +45,8 @@ export interface Conversacion {
   ultimo_mensaje: string | null;
   ultimo_mensaje_at: string | null;
   no_leidos: number;
+  agente_activo: boolean;
+  agente_motivo: string | null;
 }
 
 export interface Mensaje {
@@ -55,6 +57,7 @@ export interface Mensaje {
   texto: string | null;
   adjuntos: { url?: string; type?: string }[] | null;
   estado: string | null;
+  autor: "cliente" | "humano" | "agente";
   created_at: string;
 }
 

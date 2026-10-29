@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, Columns3, MessageCircle, Handshake, Truck, ClipboardList,
-  Receipt, FolderOpen, Settings, LogOut, Menu,
+  Receipt, FolderOpen, Settings, LogOut, Menu, Bot,
 } from "lucide-react";
 import { supabaseNavegador } from "@/lib/supabase/client";
 import { iniciales } from "@/lib/formato";
@@ -19,6 +19,7 @@ const SECCIONES = [
       { href: "/leads", nombre: "Leads", icono: Users },
       { href: "/pipeline", nombre: "Pipeline", icono: Columns3 },
       { href: "/bandeja", nombre: "Bandeja", icono: MessageCircle, contador: true },
+      { href: "/agente", nombre: "Agente IA", icono: Bot },
       { href: "/brokers", nombre: "Brokers", icono: Handshake },
     ],
   },

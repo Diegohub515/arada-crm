@@ -109,7 +109,8 @@ create table if not exists public.mensajes (
   created_at timestamptz not null default now()
 );
 create index if not exists mensajes_conv_idx on public.mensajes (conversacion_id, created_at);
-create unique index if not exists mensajes_zernio_idx on public.mensajes (zernio_message_id) where zernio_message_id is not null;
+drop index if exists public.mensajes_zernio_idx;
+create unique index if not exists mensajes_zernio_uidx on public.mensajes (zernio_message_id);
 
 -- Evita procesar dos veces el mismo webhook (Zernio reintenta)
 create table if not exists public.webhook_eventos (
@@ -216,3 +217,31 @@ begin
   begin alter publication supabase_realtime add table public.conversaciones; exception when others then null; end;
   begin alter publication supabase_realtime add table public.leads; exception when others then null; end;
 end $$;
+
+-- =====================================================================
+-- Agente de IA (contesta solo los chats). Seguro correrlo otra vez.
+-- =====================================================================
+alter table public.conversaciones add column if not exists agente_activo boolean not null default true;
+alter table public.conversaciones add column if not exists agente_motivo text;
+alter table public.mensajes add column if not exists autor text not null default 'cliente'
+  check (autor in ('cliente','humano','agente'));
+update public.mensajes set autor = 'humano' where direccion = 'saliente' and autor = 'cliente';
+
+create table if not exists public.agente_config (
+  id int primary key default 1 check (id = 1),
+  activo boolean not null default false,          -- interruptor general (arranca apagado)
+  nombre text not null default 'Sofía',
+  instrucciones text not null default
+'Somos Vivia Roma, departamentos en preventa al sur de Monterrey, cerca del Tec de Monterrey y Valle Oriente.
+Esquema de pago: 15% de enganche, 15% en mensualidades y 70% a la escrituración.
+Tenemos showroom (no hay departamento muestra).
+Objetivo: calificar al cliente y agendar visita al showroom.
+No des precios exactos: di que un asesor los comparte en la visita o por llamada.',
+  horario_showroom text default 'Lunes a sábado de 10:00 a 18:00',
+  updated_at timestamptz not null default now()
+);
+insert into public.agente_config (id) values (1) on conflict (id) do nothing;
+
+alter table public.agente_config enable row level security;
+drop policy if exists equipo_todo on public.agente_config;
+create policy equipo_todo on public.agente_config for all to authenticated using (true) with check (true);

@@ -2,7 +2,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Search, Send, Sparkles, UserRound } from "lucide-react";
+import { ArrowLeft, Bot, Search, Send, Sparkles, UserRound } from "lucide-react";
 import { Barra } from "@/components/Marco";
 import { FichaLead, PastillaEtapa } from "@/components/leads";
 import { IconoRed } from "@/components/ui";
@@ -160,6 +160,16 @@ function Chat({ conv, onVolver }: { conv: ConvConLead; onVolver: () => void }) {
     }
   }
 
+  const [agente, setAgente] = useState(conv.agente_activo);
+  useEffect(() => setAgente(conv.agente_activo), [conv.agente_activo, conv.id]);
+  async function alternarAgente() {
+    const nuevo = !agente;
+    setAgente(nuevo);
+    const { error } = await db.from("conversaciones")
+      .update({ agente_activo: nuevo, agente_motivo: nuevo ? null : "Pausado a mano" }).eq("id", conv.id);
+    if (error) { setAgente(!nuevo); setError(error.message); }
+  }
+
   async function sugerir() {
     setSugiriendo(true);
     setError(null);
@@ -183,6 +193,10 @@ function Chat({ conv, onVolver }: { conv: ConvConLead; onVolver: () => void }) {
           <small>{conv.contacto_id ?? conv.plataforma ?? ""}</small>
         </div>
         {conv.leads && <PastillaEtapa etapa={conv.leads.etapa} />}
+        <button className={`boton chico ${agente ? "agente-on" : ""}`} onClick={alternarAgente}
+          title={agente ? "El agente contesta este chat. Clic para pausarlo." : `Agente pausado${conv.agente_motivo ? ": " + conv.agente_motivo : ""}. Clic para activarlo.`}>
+          <Bot size={14} /> {agente ? "Agente activo" : "Agente pausado"}
+        </button>
         {conv.leads ? (
           <button className="boton chico" onClick={() => setFicha(true)}><UserRound size={14} /> Ficha</button>
         ) : (
@@ -197,6 +211,7 @@ function Chat({ conv, onVolver }: { conv: ConvConLead; onVolver: () => void }) {
           return [
             separador,
             <div key={m.id} className={`globo ${m.direccion} ${m.estado === "error" ? "error" : ""}`}>
+              {m.autor === "agente" && <span className="autor-agente"><Bot size={11} /> Agente IA</span>}
               {m.texto}
               {(m.adjuntos ?? []).map((a, i) => a?.url ? <div key={i}><a href={a.url} target="_blank" rel="noopener noreferrer">Ver {a.type ?? "archivo"}</a></div> : null)}
               <small>{hora(m.created_at)}{m.estado === "error" ? " · no enviado" : ""}</small>
@@ -206,6 +221,11 @@ function Chat({ conv, onVolver }: { conv: ConvConLead; onVolver: () => void }) {
         {mensajes.length === 0 && <div className="vacio">Sin mensajes guardados todavía.</div>}
         <div ref={abajo} />
       </div>
+      {!agente && conv.agente_motivo && (
+        <div className="aviso-caja" style={{ margin: "0 14px 8px" }}>
+          El agente está pausado en este chat: {conv.agente_motivo}. Contéstale tú o reactívalo arriba.
+        </div>
+      )}
       {error && <div className="error-caja" style={{ margin: "0 14px 8px" }}>{error}</div>}
       <div className="redactor">
         <button className="boton icono" onClick={sugerir} disabled={sugiriendo} title="Sugerir respuesta con IA" aria-label="Sugerir respuesta con IA">

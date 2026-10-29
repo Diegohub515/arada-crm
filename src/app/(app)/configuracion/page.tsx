@@ -14,7 +14,7 @@ export default async function Configuracion() {
     { nombre: "Zernio (enviar mensajes)", ok: !!process.env.ZERNIO_API_KEY, falta: "ZERNIO_API_KEY" },
     { nombre: "Zernio (recibir mensajes y leads)", ok: !!process.env.ZERNIO_WEBHOOK_SECRET, falta: "ZERNIO_WEBHOOK_SECRET" },
     { nombre: "Entrada de leads (Zapier, Google, landings)", ok: !!process.env.LEADS_WEBHOOK_TOKEN, falta: "LEADS_WEBHOOK_TOKEN" },
-    { nombre: "IA (sugerencias y análisis)", ok: !!process.env.ANTHROPIC_API_KEY, falta: "ANTHROPIC_API_KEY" },
+    { nombre: "IA (agente que contesta, sugerencias y análisis)", ok: !!process.env.ANTHROPIC_API_KEY, falta: "ANTHROPIC_API_KEY" },
   ];
 
   return (

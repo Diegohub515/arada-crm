@@ -37,17 +37,19 @@ export async function POST(req: Request) {
       idempotencia,
     });
     const ahora = new Date().toISOString();
-    await db.from("mensajes").insert({
+    await db.from("mensajes").upsert({
       conversacion_id: conv.id,
       zernio_message_id: r.messageId,
       direccion: "saliente",
       texto: texto.trim(),
       estado: r.fallaParcial ? "error" : "enviado",
+      autor: "humano",
       enviado_por: auth.user.id,
       created_at: ahora,
-    });
+    }, { onConflict: "zernio_message_id" });
+    // Cuando una persona contesta, el agente se hace a un lado en este chat.
     await db.from("conversaciones")
-      .update({ ultimo_mensaje: texto.trim(), ultimo_mensaje_at: ahora, no_leidos: 0 })
+      .update({ ultimo_mensaje: texto.trim(), ultimo_mensaje_at: ahora, no_leidos: 0, agente_activo: false, agente_motivo: "Lo atiende una persona" })
       .eq("id", conv.id);
     if (conv.lead_id) {
       await db.from("actividades").insert({

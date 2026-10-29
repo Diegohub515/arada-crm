@@ -6,7 +6,8 @@ CRM de Arada para la preventa de Vivia Roma y Vivia Santa Catarina.
 - **Pipeline** por etapas (nuevo → contactado → cita en showroom → apartado → cerrado / perdido), arrastrando tarjetas.
 - **Bandeja** para contestar WhatsApp, Instagram y Messenger desde el CRM (vía [Zernio](https://zernio.com)).
 - **Brokers**, **proveedores**, **órdenes de compra**, **facturas** (con PDF/XML) y **documentos**.
-- **IA**: sugiere respuestas en los chats, propone el siguiente paso de cada lead y analiza tus gastos.
+- **Agente IA** que contesta solo los chats: califica al lead, guarda sus datos, ofrece visita al showroom y pasa el chat a una persona cuando hace falta. Su prompt se edita en el CRM (menú **Agente IA**) y se puede pausar en general o por chat.
+- **IA de apoyo**: sugiere respuestas, propone el siguiente paso de cada lead y analiza tus gastos.
 
 Hecho con Next.js (la app), Supabase (base de datos, usuarios y archivos), Vercel (lo publica en internet) y Zernio (redes y WhatsApp).
 
@@ -38,7 +39,7 @@ Hecho con Next.js (la app), Supabase (base de datos, usuarios y archivos), Verce
    | `ZERNIO_API_KEY` | tu API key de Zernio |
    | `ZERNIO_WEBHOOK_SECRET` | una frase larga que inventes |
    | `LEADS_WEBHOOK_TOKEN` | otra frase larga que inventes |
-   | `ANTHROPIC_API_KEY` | (opcional) para la IA, de console.anthropic.com |
+   | `ANTHROPIC_API_KEY` | para el agente y la IA, de console.anthropic.com (sin ella todo funciona menos la IA) |
 
 4. Presiona **Deploy**. En 1–2 minutos te da una dirección tipo `arada-crm.vercel.app`. Entra con el usuario que creaste.
 
@@ -55,6 +56,13 @@ Hecho con Next.js (la app), Supabase (base de datos, usuarios y archivos), Verce
 4. Manda un WhatsApp de prueba al número del negocio: debe aparecer en **Bandeja** y como lead nuevo.
 
 Dentro del CRM, la página **Conexiones** te muestra qué falta y las URLs exactas.
+
+### 3b. Agente IA
+
+1. En el CRM entra a **Agente IA**, revisa el prompt (información de Vivia Roma, esquema de pago, horario) y guárdalo.
+2. Pruébalo en el chat de prueba de la misma página, escribiendo como si fueras cliente.
+3. Cuando te guste, enciéndelo con el interruptor de arriba. Arranca apagado.
+4. **Si ya tienes otro bot contestando el mismo WhatsApp (por ejemplo, en Zapier), apágalo** para que el cliente no reciba dos respuestas.
 
 ### 4. Google Ads y Zapier
 
