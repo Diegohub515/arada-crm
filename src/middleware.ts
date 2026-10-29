@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 // Rutas que no piden sesión: login y webhooks (se protegen con firma o token).
-const PUBLICAS = ["/login", "/api/webhooks"];
+// /api/agente/analizar revisa su propia autorización (sesión o CRON_SECRET de Vercel).
+const PUBLICAS = ["/login", "/api/webhooks", "/api/agente/analizar"];
 
 export async function middleware(request: NextRequest) {
   let respuesta = NextResponse.next({ request });

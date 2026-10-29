@@ -190,6 +190,37 @@ function Chat({ conv, onVolver }: { conv: ConvConLead; onVolver: () => void }) {
     }
   }
 
+  // 👍/👎 de los asesores a las respuestas del bot (alimentan el aprendizaje)
+  const [votos, setVotos] = useState<Record<string, number>>({});
+  const [corrigiendo, setCorrigiendo] = useState<string | null>(null);
+  const [correccion, setCorreccion] = useState("");
+  useEffect(() => {
+    const ids = mensajes.filter((m) => m.autor === "agente").map((m) => m.id);
+    if (!ids.length) return;
+    db.from("mensaje_feedback").select("mensaje_id, voto").in("mensaje_id", ids.slice(-200))
+      .then(({ data }) => setVotos(Object.fromEntries((data ?? []).map((v: any) => [v.mensaje_id, v.voto]))));
+  }, [db, mensajes]);
+  async function votar(m: Mensaje, voto: 1 | -1, texto?: string) {
+    const { data: u } = await db.auth.getUser();
+    const corr = texto?.trim() || null;
+    const { error } = await db.from("mensaje_feedback").upsert(
+      { mensaje_id: m.id, voto, correccion: corr, usuario: u.user?.id },
+      { onConflict: "mensaje_id,usuario" },
+    );
+    if (error) { setError(`No se guardó tu voto: ${error.message}`); return; }
+    setVotos((v) => ({ ...v, [m.id]: voto }));
+    setCorrigiendo(null);
+    if (voto === -1 && corr) {
+      const i = mensajes.findIndex((x) => x.id === m.id);
+      const previo = [...mensajes.slice(0, i)].reverse().find((x) => x.direccion === "entrante");
+      await db.from("agente_lecciones").insert({
+        texto: previo?.texto ? `Si el cliente dice algo como "${previo.texto.slice(0, 160)}", responde así: ${corr}` : corr,
+        categoria: "estilo", origen: "asesor", estado: "pendiente", creado_por: u.user?.id,
+        evidencia: `El bot contestó: "${(m.texto ?? "").slice(0, 200)}"`,
+      });
+    }
+  }
+
   const [agente, setAgente] = useState(conv.agente_activo);
   useEffect(() => setAgente(conv.agente_activo), [conv.agente_activo, conv.id]);
   async function alternarAgente() {
@@ -252,7 +283,24 @@ function Chat({ conv, onVolver }: { conv: ConvConLead; onVolver: () => void }) {
               {m.autor === "agente" && <span className="autor-agente"><Bot size={11} /> Agente IA</span>}
               {m.texto}
               {(m.adjuntos ?? []).map((a, i) => a?.url ? <div key={i}><a href={a.url} target="_blank" rel="noopener noreferrer">Ver {a.type ?? "archivo"}</a></div> : null)}
-              <small>{hora(m.created_at)}{m.estado === "error" ? " · no enviado" : ""}</small>
+              <small>{hora(m.created_at)}{m.estado === "error" ? " · no enviado" : ""}
+                {m.autor === "agente" && (
+                  <span className="feedback-bot">
+                    <button className={votos[m.id] === 1 ? "activo" : ""} onClick={() => votar(m, 1)} title="Buena respuesta" aria-label="Buena respuesta">👍</button>
+                    <button className={votos[m.id] === -1 ? "activo" : ""} onClick={() => { setCorrigiendo(m.id); setCorreccion(""); }} title="Mala respuesta: enséñale cómo" aria-label="Mala respuesta">👎</button>
+                  </span>
+                )}
+              </small>
+              {corrigiendo === m.id && (
+                <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <textarea className="entrada" rows={2} autoFocus placeholder="¿Cómo debió contestar? (opcional)" value={correccion}
+                    onChange={(e) => setCorreccion(e.target.value)} aria-label="Cómo debió contestar" />
+                  <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                    <button className="boton chico" onClick={() => setCorrigiendo(null)}>Cancelar</button>
+                    <button className="boton chico primario" onClick={() => votar(m, -1, correccion)}>Guardar</button>
+                  </div>
+                </div>
+              )}
             </div>,
           ];
         })}

@@ -551,3 +551,50 @@ begin
     execute format('create policy equipo_todo on public.%I for all to authenticated using (true) with check (true)', t);
   end loop;
 end $$;
+
+-- =====================================================================
+-- Aprendizaje del agente: lecciones aprobadas que el bot lee en cada mensaje,
+-- análisis semanales de los chats y 👍/👎 de los asesores.
+-- =====================================================================
+create table if not exists public.agente_lecciones (
+  id uuid primary key default gen_random_uuid(),
+  texto text not null,
+  categoria text not null default 'estilo',   -- dato | estilo | flujo | evitar
+  origen text not null default 'manual',      -- analisis | asesor | manual
+  estado text not null default 'pendiente',   -- pendiente | aprobada | descartada
+  evidencia text,
+  analisis_id uuid,
+  creado_por uuid references public.perfiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  aprobada_at timestamptz
+);
+create index if not exists agente_lecciones_estado_idx on public.agente_lecciones (estado);
+
+create table if not exists public.agente_analisis (
+  id uuid primary key default gen_random_uuid(),
+  desde timestamptz not null,
+  hasta timestamptz not null,
+  resumen text,
+  metricas jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.mensaje_feedback (
+  id uuid primary key default gen_random_uuid(),
+  mensaje_id uuid not null references public.mensajes(id) on delete cascade,
+  voto smallint not null check (voto in (-1, 1)),
+  correccion text,
+  usuario uuid references public.perfiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  unique (mensaje_id, usuario)
+);
+
+do $$
+declare t text;
+begin
+  foreach t in array array['agente_lecciones','agente_analisis','mensaje_feedback'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists equipo_todo on public.%I', t);
+    execute format('create policy equipo_todo on public.%I for all to authenticated using (true) with check (true)', t);
+  end loop;
+end $$;

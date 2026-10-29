@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bot, RotateCcw, Send } from "lucide-react";
 import { Barra } from "@/components/Marco";
 import { useToast } from "@/components/ui";
+import Aprendizaje from "@/components/Aprendizaje";
 import { supabaseNavegador } from "@/lib/supabase/client";
 
 type Config = { activo: boolean; nombre: string; instrucciones: string; horario_showroom: string | null; updated_at?: string };
@@ -91,6 +92,7 @@ export default function Agente() {
         )}
       </Barra>
       <div className="contenido">
+        <Aprendizaje avisar={avisar} />
         {error && <div className="error-caja">{error}</div>}
         {config && (
           <>

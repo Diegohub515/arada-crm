@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/agente/analizar", "schedule": "0 15 * * 1" }
+  ]
+}

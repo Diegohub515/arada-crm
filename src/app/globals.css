@@ -433,3 +433,9 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 /* Filtros de la bandeja: bajan a otra línea en vez de cortarse */
 .filtros-bandeja { display: flex; flex-wrap: wrap; gap: 4px; }
 .filtros-bandeja button { white-space: nowrap; flex: 1 0 auto; }
+
+/* Lecciones del agente */
+.leccion { border: 1px solid var(--borde); border-radius: var(--radio-chico); padding: 10px 12px; margin-bottom: 8px; background: var(--superficie); }
+.feedback-bot { display: inline-flex; gap: 2px; margin-left: 6px; vertical-align: middle; }
+.feedback-bot button { border: 0; background: transparent; cursor: pointer; padding: 0 3px; font-size: 12px; opacity: .55; }
+.feedback-bot button:hover, .feedback-bot button.activo { opacity: 1; }

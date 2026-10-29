@@ -120,10 +120,35 @@ export async function POST(req: Request) {
       ...(direccion === "saliente" && !esBot ? { agente_activo: false, agente_motivo: "Lo atiende una persona" } : {}),
     }).eq("id", conv.id);
 
+    // El bot detectó el nombre del cliente: se guarda si el lead no tenía uno real
+    const nombreCliente = String(p.nombre_cliente ?? "").trim().slice(0, 80);
+    if (direccion === "saliente" && esBot && nombreCliente) {
+      await db.from("conversaciones").update({ contacto_nombre: nombreCliente }).eq("id", conv.id);
+      if (conv.lead_id) {
+        const { data: lead } = await db.from("leads").select("nombre").eq("id", conv.lead_id).maybeSingle();
+        if (lead && !nombreReal(lead.nombre)) await db.from("leads").update({ nombre: nombreCliente }).eq("id", conv.lead_id);
+      }
+    }
+
     if (direccion === "saliente") return NextResponse.json({ responder: false, respuesta: "" });
 
     if (String(p.solo_registrar ?? "").toLowerCase() === "true" || p.solo_registrar === true) {
-      return NextResponse.json({ responder: false, respuesta: "", lead_id: conv.lead_id, bot_pausado: botPausado });
+      // Para el bot de Zapier: si debe callarse, lo que ya aprendió y el nombre del cliente si lo sabemos
+      const [{ data: lecciones }, { data: lead }] = await Promise.all([
+        db.from("agente_lecciones").select("texto, categoria").eq("estado", "aprobada").order("created_at").limit(60),
+        conv.lead_id ? db.from("leads").select("nombre").eq("id", conv.lead_id).maybeSingle() : Promise.resolve({ data: null }),
+      ]);
+      let textoLecciones = "";
+      for (const l of lecciones ?? []) {
+        const linea = `- (${l.categoria}) ${l.texto}\n`;
+        if (textoLecciones.length + linea.length > 4000) break;
+        textoLecciones += linea;
+      }
+      return NextResponse.json({
+        responder: false, respuesta: "", lead_id: conv.lead_id, bot_pausado: botPausado,
+        nombre_cliente: nombreReal((lead as any)?.nombre) ? (lead as any).nombre : "",
+        lecciones: textoLecciones,
+      });
     }
 
     // 3. Si el cliente manda varios mensajes seguidos, solo contesta el último
@@ -139,6 +164,12 @@ export async function POST(req: Request) {
     console.error("WhatsApp por Zapier:", e);
     return NextResponse.json({ error: e?.message ?? "Error", responder: false, respuesta: "" }, { status: 500 });
   }
+}
+
+/** ¿Es un nombre de verdad y no "Sin nombre" o un teléfono? */
+function nombreReal(n: unknown) {
+  const s = String(n ?? "").trim();
+  return !!s && s.toLowerCase() !== "sin nombre" && !/^\+?[\d\s-]{7,}$/.test(s);
 }
 
 function tokenValido(t: unknown) {
