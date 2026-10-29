@@ -24,6 +24,12 @@ export async function POST(req: Request) {
     .eq("id", conversacionId)
     .single();
   if (!conv) return NextResponse.json({ error: "No encontré esa conversación" }, { status: 404 });
+
+  // Chats de WhatsApp que entran por Zapier: se mandan por la automatización "crm-a-whatsapp"
+  if (String(conv.zernio_conversation_id ?? "").startsWith("wa:")) {
+    return enviarPorZapier(db, conv, texto.trim(), auth.user.id);
+  }
+
   if (!conv.zernio_account_id) {
     return NextResponse.json({ error: "La conversación no tiene cuenta de Zernio asociada" }, { status: 400 });
   }
@@ -66,4 +72,62 @@ export async function POST(req: Request) {
       : "";
     return NextResponse.json({ error: `Zernio no pudo enviar el mensaje: ${msg}.${ventana}` }, { status: 502 });
   }
+}
+
+const VENTANA_MS = 24 * 60 * 60 * 1000;
+
+async function enviarPorZapier(
+  db: ReturnType<typeof supabaseAdmin>,
+  conv: { id: string; zernio_conversation_id: string; lead_id: string | null },
+  texto: string,
+  usuarioId: string,
+) {
+  const hook = process.env.ZAPIER_WA_SALIDA_URL;
+  if (!hook) {
+    return NextResponse.json({ error: "Falta configurar ZAPIER_WA_SALIDA_URL en Vercel para contestar WhatsApp desde el CRM." }, { status: 500 });
+  }
+
+  // WhatsApp solo deja mandar texto libre dentro de las 24 h desde el último mensaje del cliente
+  const { data: ultimo } = await db.from("mensajes").select("created_at")
+    .eq("conversacion_id", conv.id).eq("direccion", "entrante")
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (!ultimo || Date.now() - new Date(ultimo.created_at).getTime() > VENTANA_MS) {
+    return NextResponse.json({
+      error: "Pasaron más de 24 horas desde el último mensaje del cliente. WhatsApp solo permite mandarle una plantilla aprobada (como las de RMKT).",
+    }, { status: 400 });
+  }
+
+  const telefono = conv.zernio_conversation_id.slice(3);
+  const mensajeId = crypto.randomUUID();
+  const ahora = new Date().toISOString();
+  const { data: fila, error } = await db.from("mensajes").insert({
+    conversacion_id: conv.id,
+    zernio_message_id: `crm:${mensajeId}`,
+    direccion: "saliente", texto, estado: "enviado", autor: "humano",
+    enviado_por: usuarioId, created_at: ahora,
+  }).select("id").single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  let ok = false;
+  try {
+    const r = await fetch(hook, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ telefono, texto, mensaje_id: mensajeId }),
+    });
+    ok = r.ok;
+  } catch { ok = false; }
+
+  if (!ok) {
+    await db.from("mensajes").update({ estado: "error" }).eq("id", fila.id);
+    return NextResponse.json({ error: "Zapier no recibió el mensaje. Revisa que la automatización \"crm-a-whatsapp\" esté prendida." }, { status: 502 });
+  }
+
+  // Cuando un asesor contesta, el bot de WhatsApp se hace a un lado en este chat.
+  await db.from("conversaciones")
+    .update({ ultimo_mensaje: texto, ultimo_mensaje_at: ahora, no_leidos: 0, agente_activo: false, agente_motivo: "Lo atiende una persona" })
+    .eq("id", conv.id);
+  if (conv.lead_id) {
+    await db.from("actividades").insert({ lead_id: conv.lead_id, tipo: "whatsapp", texto: `Respuesta enviada: ${texto}`, creado_por: usuarioId });
+  }
+  return NextResponse.json({ ok: true, aviso: null });
 }

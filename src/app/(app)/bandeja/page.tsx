@@ -213,6 +213,14 @@ function Chat({ conv, onVolver }: { conv: ConvConLead; onVolver: () => void }) {
   const nombre = conv.leads?.nombre && conv.leads.nombre !== "Sin nombre" ? conv.leads.nombre : conv.contacto_nombre || conv.contacto_id || "Contacto";
   let diaAnterior = "";
 
+  // WhatsApp por Zapier: se contesta por la automatización "crm-a-whatsapp" y solo dentro de las 24 h
+  const porZapier = String(conv.zernio_conversation_id ?? "").startsWith("wa:");
+  const puedeEscribir = !!conv.zernio_account_id || porZapier;
+  const ultimoCliente = [...mensajes].reverse().find((m) => m.direccion === "entrante");
+  const msRestantes = ultimoCliente ? new Date(ultimoCliente.created_at).getTime() + 24 * 3600 * 1000 - Date.now() : -1;
+  const ventanaCerrada = porZapier && msRestantes <= 0;
+  const horasRestantes = Math.max(0, Math.floor(msRestantes / 3600000));
+
   return (
     <section className="conversacion">
       <header className="conversacion-cabeza">
@@ -257,11 +265,18 @@ function Chat({ conv, onVolver }: { conv: ConvConLead; onVolver: () => void }) {
         </div>
       )}
       {error && <div className="error-caja" style={{ margin: "0 14px 8px" }}>{error}</div>}
-      {!conv.zernio_account_id ? (
-        <div className="aviso-caja" style={{ margin: "0 14px 12px" }}>
-          Este chat entra por Zapier: el agente IA contesta solo; si lo atiendes tú, contesta desde WhatsApp. Para contestar desde aquí hay que conectar el número a Zernio.
+      {porZapier && mensajes.length > 0 && (
+        <div className="aviso-caja" style={{ margin: "0 14px 8px" }}>
+          {ventanaCerrada
+            ? "Pasaron más de 24 h desde el último mensaje del cliente: WhatsApp solo permite mandarle una plantilla aprobada (como las de RMKT)."
+            : `Puedes contestarle por WhatsApp ${horasRestantes > 0 ? `durante ${horasRestantes} h más` : "por menos de 1 h más"}. Al contestar tú, el bot se pausa en este chat.`}
         </div>
-      ) : (
+      )}
+      {!puedeEscribir ? (
+        <div className="aviso-caja" style={{ margin: "0 14px 12px" }}>
+          Este chat no tiene una cuenta conectada para contestar desde aquí.
+        </div>
+      ) : ventanaCerrada ? null : (
       <div className="redactor">
         <button className="boton icono" onClick={sugerir} disabled={sugiriendo} title="Sugerir respuesta con IA" aria-label="Sugerir respuesta con IA">
           <Sparkles size={16} />

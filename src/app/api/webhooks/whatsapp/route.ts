@@ -41,6 +41,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Token inválido" }, { status: 401 });
   }
 
+  // Zapier avisa que un mensaje escrito desde el CRM no se pudo mandar por WhatsApp
+  if (p.accion === "estado") {
+    if (!p.mensaje_id) return NextResponse.json({ ok: false, error: "Falta mensaje_id" }, { status: 400 });
+    const { error } = await supabaseAdmin().from("mensajes")
+      .update({ estado: p.estado === "enviado" ? "enviado" : "error" })
+      .eq("zernio_message_id", `crm:${p.mensaje_id}`);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
   const telefono = normalizarTelefono(p.telefono ?? p.phone ?? p.from ?? p.wa_id);
   const texto = String(p.mensaje ?? p.message ?? p.text ?? p.body ?? "").trim();
   const nombre = String(p.nombre ?? p.name ?? p.profile_name ?? "").trim() || null;
@@ -53,7 +63,7 @@ export async function POST(req: Request) {
   try {
     // 1. Conversación de este teléfono
     const clave = `wa:${telefono}`;
-    let { data: conv } = await db.from("conversaciones").select("id, lead_id, no_leidos, contacto_nombre").eq("zernio_conversation_id", clave).maybeSingle();
+    let { data: conv } = await db.from("conversaciones").select("id, lead_id, no_leidos, contacto_nombre, agente_activo").eq("zernio_conversation_id", clave).maybeSingle();
     if (!conv) {
       const r = await guardarLead(db, {
         nombre, telefono, origen: "whatsapp",
@@ -63,9 +73,9 @@ export async function POST(req: Request) {
       });
       const { data, error } = await db.from("conversaciones")
         .insert({ zernio_conversation_id: clave, plataforma: "whatsapp", contacto_nombre: nombre, contacto_id: telefono, lead_id: r.id })
-        .select("id, lead_id, no_leidos, contacto_nombre").single();
+        .select("id, lead_id, no_leidos, contacto_nombre, agente_activo").single();
       if (error?.code === "23505") {
-        ({ data: conv } = await db.from("conversaciones").select("id, lead_id, no_leidos, contacto_nombre").eq("zernio_conversation_id", clave).single());
+        ({ data: conv } = await db.from("conversaciones").select("id, lead_id, no_leidos, contacto_nombre, agente_activo").eq("zernio_conversation_id", clave).single());
       } else if (error) throw error;
       else conv = data;
     }
@@ -79,7 +89,9 @@ export async function POST(req: Request) {
       direccion, texto, autor: direccion === "entrante" ? "cliente" : esBot ? "agente" : "humano",
       estado: direccion === "entrante" ? "recibido" : "enviado", created_at: ahora,
     }).select("id").single();
-    if (errMsg?.code === "23505") return NextResponse.json({ responder: false, respuesta: "", motivo: "duplicado" });
+    // bot_pausado: el bot de Zapier no debe contestar porque un asesor tomó el chat (o se pausó a mano)
+    const botPausado = conv.agente_activo === false;
+    if (errMsg?.code === "23505") return NextResponse.json({ responder: false, respuesta: "", motivo: "duplicado", bot_pausado: botPausado });
     if (errMsg) throw errMsg;
 
     await db.from("conversaciones").update({
@@ -92,7 +104,7 @@ export async function POST(req: Request) {
     if (direccion === "saliente") return NextResponse.json({ responder: false, respuesta: "" });
 
     if (String(p.solo_registrar ?? "").toLowerCase() === "true" || p.solo_registrar === true) {
-      return NextResponse.json({ responder: false, respuesta: "", lead_id: conv.lead_id });
+      return NextResponse.json({ responder: false, respuesta: "", lead_id: conv.lead_id, bot_pausado: botPausado });
     }
 
     // 3. Si el cliente manda varios mensajes seguidos, solo contesta el último
