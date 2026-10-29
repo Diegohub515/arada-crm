@@ -1,25 +1,25 @@
 /* Arada CRM — interfaz clara tipo panel, acento violeta */
 :root {
-  --fondo: #f6f6f9;
+  --fondo: #f7f9f8;
   --superficie: #ffffff;
-  --superficie-2: #f2f1f7;
-  --borde: #e7e5ef;
-  --texto: #1b1a24;
-  --texto-2: #5f5c70;
-  --texto-3: #918ea3;
-  --acento: #6c47e6;
-  --acento-suave: #efeafe;
-  --acento-texto: #5232c7;
-  --bien: #16865a;
-  --bien-suave: #e4f5ec;
+  --superficie-2: #eff4f1;
+  --borde: #e2eae5;
+  --texto: #17211c;
+  --texto-2: #56645c;
+  --texto-3: #8a988f;
+  --acento: #1f8a52;
+  --acento-suave: #e5f4eb;
+  --acento-texto: #17703f;
+  --bien: #0f7d6e;
+  --bien-suave: #e0f3f0;
   --mal: #c8344a;
   --mal-suave: #fbe8eb;
   --aviso: #a8650a;
   --aviso-suave: #fdf1df;
   --info: #2a6fd6;
   --info-suave: #e6effc;
-  --sombra: 0 1px 2px rgba(27, 26, 36, 0.04), 0 1px 1px rgba(27, 26, 36, 0.03);
-  --sombra-flotante: 0 18px 50px rgba(27, 26, 36, 0.18);
+  --sombra: 0 1px 2px rgba(23, 33, 28, 0.04), 0 1px 1px rgba(23, 33, 28, 0.03);
+  --sombra-flotante: 0 18px 50px rgba(23, 33, 28, 0.18);
   --radio: 12px;
   --radio-chico: 8px;
   --lateral: 248px;
@@ -27,18 +27,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --fondo: #121118;
-    --superficie: #1a1922;
-    --superficie-2: #23212d;
-    --borde: #2e2c3a;
-    --texto: #ecebf3;
-    --texto-2: #aaa7bb;
-    --texto-3: #7a7790;
-    --acento: #8c6cf5;
-    --acento-suave: #2a2347;
-    --acento-texto: #b9a6ff;
-    --bien: #4cc38a;
-    --bien-suave: #193326;
+    --fondo: #0f1411;
+    --superficie: #161d19;
+    --superficie-2: #1f2823;
+    --borde: #2a352f;
+    --texto: #e9f0ec;
+    --texto-2: #a5b3ab;
+    --texto-3: #75847b;
+    --acento: #45c07f;
+    --acento-suave: #173323;
+    --acento-texto: #7ed9a6;
+    --bien: #3fc2ae;
+    --bien-suave: #15302c;
     --mal: #f07084;
     --mal-suave: #3a1c23;
     --aviso: #e7a54a;
@@ -78,7 +78,7 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .marca { display: flex; align-items: center; gap: 10px; padding: 2px 6px; }
 .marca-logo {
   width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
-  background: linear-gradient(140deg, var(--acento), #c45ad6); color: #fff; font-weight: 800; font-size: 15px;
+  background: linear-gradient(140deg, #1f8a52, #5cc184); color: #fff; font-weight: 800; font-size: 15px;
 }
 .marca b { display: block; font-size: 14px; }
 .marca small { color: var(--texto-3); font-size: 11.5px; }
@@ -238,7 +238,7 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 .grafica text { fill: var(--texto-3); font-size: 11px; }
 
 /* ---------- Ventanas ---------- */
-.velo { position: fixed; inset: 0; background: rgba(15, 14, 22, 0.42); z-index: 40; display: flex; justify-content: center; align-items: flex-start; padding: 6vh 16px; overflow-y: auto; }
+.velo { position: fixed; inset: 0; background: rgba(12, 20, 16, 0.42); z-index: 40; display: flex; justify-content: center; align-items: flex-start; padding: 6vh 16px; overflow-y: auto; }
 .velo.lado { justify-content: flex-end; align-items: stretch; padding: 0; }
 .ventana { background: var(--superficie); border-radius: 14px; box-shadow: var(--sombra-flotante); width: min(640px, 100%); display: flex; flex-direction: column; }
 .panel { background: var(--superficie); width: min(560px, 100%); height: 100%; overflow-y: auto; box-shadow: var(--sombra-flotante); display: flex; flex-direction: column; }
