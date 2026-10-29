@@ -20,6 +20,8 @@ export const maxDuration = 60;
  *   mensaje   → texto que mandó
  *   mensaje_id (opcional) → id del mensaje, evita duplicados si Zapier reintenta
  *   direccion (opcional) → "saliente" si registras un mensaje que mandó un asesor
+ *   autor (opcional) → "bot" si el saliente lo mandó un bot (no pausa al agente)
+ *   solo_registrar (opcional) → true para guardar el chat sin que conteste el agente del CRM
  *
  * Responde: { responder: true|false, respuesta: "texto para enviar" }
  * Después agrega en el Zap: Filtro "responder es true" → acción de WhatsApp que envía {{respuesta}}.
@@ -43,6 +45,8 @@ export async function POST(req: Request) {
   const texto = String(p.mensaje ?? p.message ?? p.text ?? p.body ?? "").trim();
   const nombre = String(p.nombre ?? p.name ?? p.profile_name ?? "").trim() || null;
   const direccion = p.direccion === "saliente" ? "saliente" : "entrante";
+  // autor = "bot" cuando el mensaje lo mandó un bot externo (ej. el bot de Zapier): se guarda sin pausar al agente
+  const esBot = direccion === "saliente" && ["bot", "agente"].includes(String(p.autor ?? "").toLowerCase());
   if (!telefono) return NextResponse.json({ error: "Falta el teléfono del cliente (campo telefono)" }, { status: 400 });
 
   const db = supabaseAdmin();
@@ -72,7 +76,7 @@ export async function POST(req: Request) {
     const { data: fila, error: errMsg } = await db.from("mensajes").insert({
       conversacion_id: conv.id,
       zernio_message_id: p.mensaje_id ? `wa:${p.mensaje_id}` : null,
-      direccion, texto, autor: direccion === "entrante" ? "cliente" : "humano",
+      direccion, texto, autor: direccion === "entrante" ? "cliente" : esBot ? "agente" : "humano",
       estado: direccion === "entrante" ? "recibido" : "enviado", created_at: ahora,
     }).select("id").single();
     if (errMsg?.code === "23505") return NextResponse.json({ responder: false, respuesta: "", motivo: "duplicado" });
@@ -82,10 +86,14 @@ export async function POST(req: Request) {
       ultimo_mensaje: texto, ultimo_mensaje_at: ahora,
       contacto_nombre: conv.contacto_nombre ?? nombre,
       no_leidos: direccion === "entrante" ? (conv.no_leidos ?? 0) + 1 : 0,
-      ...(direccion === "saliente" ? { agente_activo: false, agente_motivo: "Lo atiende una persona" } : {}),
+      ...(direccion === "saliente" && !esBot ? { agente_activo: false, agente_motivo: "Lo atiende una persona" } : {}),
     }).eq("id", conv.id);
 
     if (direccion === "saliente") return NextResponse.json({ responder: false, respuesta: "" });
+
+    if (String(p.solo_registrar ?? "").toLowerCase() === "true" || p.solo_registrar === true) {
+      return NextResponse.json({ responder: false, respuesta: "", lead_id: conv.lead_id });
+    }
 
     // 3. Si el cliente manda varios mensajes seguidos, solo contesta el último
     await new Promise((r) => setTimeout(r, 4000));
