@@ -433,3 +433,7 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 .celda-select:hover { border-color: var(--borde); background: var(--superficie); }
 .celda-etapa { position: relative; display: inline-block; }
 .celda-etapa .celda-select { position: absolute; inset: 0; opacity: 0; min-width: 0; cursor: pointer; }
+
+/* Filtros de la bandeja: bajan a otra línea en vez de cortarse */
+.filtros-bandeja { display: flex; flex-wrap: wrap; gap: 4px; }
+.filtros-bandeja button { white-space: nowrap; flex: 1 0 auto; }

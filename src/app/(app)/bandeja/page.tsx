@@ -9,6 +9,14 @@ import { IconoRed } from "@/components/ui";
 import { supabaseNavegador } from "@/lib/supabase/client";
 import type { Conversacion, Lead, Mensaje } from "@/lib/tipos";
 import { hora, iniciales, relativo } from "@/lib/formato";
+import { nombreOrigen } from "@/lib/tipos";
+
+// Filtros de la bandeja: los de chat filtran conversaciones; Formulario y Google Ads muestran leads que llegaron sin chat.
+const FILTROS: [string, string][] = [
+  ["todas", "Todas"], ["no_leidas", "No leídas"], ["whatsapp", "WhatsApp"], ["instagram", "Instagram"],
+  ["facebook", "Facebook"], ["formulario", "Formulario"], ["google_ads", "Google Ads"],
+];
+const ORIGENES_FILTRO: Record<string, string[]> = { formulario: ["meta_formulario", "landing"], google_ads: ["google_ads"] };
 
 type ConvConLead = Conversacion & { leads: Pick<Lead, "id" | "nombre" | "etapa"> | null };
 
@@ -25,6 +33,16 @@ function Bandeja() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState("todas");
+  const [leadsForm, setLeadsForm] = useState<{ id: string; nombre: string; telefono: string | null; origen: string; campana: string | null; etapa: string; created_at: string }[] | null>(null);
+  const esLeads = filtro in ORIGENES_FILTRO;
+
+  useEffect(() => {
+    if (!esLeads) return;
+    setLeadsForm(null);
+    db.from("leads").select("id, nombre, telefono, origen, campana, etapa, created_at")
+      .in("origen", ORIGENES_FILTRO[filtro]).order("created_at", { ascending: false }).limit(300)
+      .then(({ data }) => setLeadsForm((data ?? []) as any));
+  }, [db, filtro, esLeads]);
 
   const cargar = useCallback(async () => {
     const { data, error } = await db
@@ -64,15 +82,27 @@ function Bandeja() {
               <Search size={15} />
               <input id="buscar-chat" className="entrada" placeholder="Buscar chat…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
-            <div className="segmentos" style={{ overflowX: "auto" }}>
-              {[["todas", "Todas"], ["no_leidas", "No leídas"], ["whatsapp", "WhatsApp"], ["instagram", "Instagram"], ["facebook", "Messenger"]].map(([id, n]) => (
+            <div className="segmentos filtros-bandeja">
+              {FILTROS.map(([id, n]) => (
                 <button key={id} className={filtro === id ? "activo" : ""} onClick={() => setFiltro(id)}>{n}</button>
               ))}
             </div>
           </div>
           <div className="chats">
             {error && <div className="error-caja" style={{ margin: 12 }}>{error}</div>}
-            {visibles.map((c) => {
+            {esLeads && (leadsForm ?? []).filter((l) => !q.trim() || `${l.nombre} ${l.telefono ?? ""} ${l.campana ?? ""}`.toLowerCase().includes(q.trim().toLowerCase())).map((l) => (
+              <button key={l.id} className="chat-item" onClick={() => router.push(`/leads/${l.id}`)}>
+                <span className="avatar">{iniciales(l.nombre)}</span>
+                <div>
+                  <div className="arriba"><b>{l.nombre}</b><small>{relativo(l.created_at)}</small></div>
+                  <div className="arriba"><p style={{ flex: 1 }}>{l.campana ?? nombreOrigen(l.origen)}{l.telefono ? ` · ${l.telefono}` : ""}</p><PastillaEtapa etapa={l.etapa} /></div>
+                </div>
+              </button>
+            ))}
+            {esLeads && leadsForm && leadsForm.length === 0 && (
+              <div className="vacio"><b>Sin leads de {filtro === "google_ads" ? "Google Ads" : "formularios"} todavía</b>Llegan aquí cuando conectes el formulario en Zapier o Google Ads (ver Conexiones).</div>
+            )}
+            {!esLeads && visibles.map((c) => {
               const nombre = c.leads?.nombre && c.leads.nombre !== "Sin nombre" ? c.leads.nombre : c.contacto_nombre || c.contacto_id || "Contacto";
               return (
                 <button key={c.id} className={`chat-item ${c.id === activaId ? "activo" : ""}`} onClick={() => abrir(c.id)}>
@@ -91,10 +121,10 @@ function Bandeja() {
                 </button>
               );
             })}
-            {convs && visibles.length === 0 && (
+            {!esLeads && convs && visibles.length === 0 && (
               <div className="vacio">
                 <b>{convs.length ? "Sin resultados" : "Aún no hay chats"}</b>
-                {convs.length ? "Prueba otro filtro." : "Cuando conectes Zernio, aquí aparecerán los mensajes de WhatsApp, Instagram y Messenger."}
+                {convs.length ? "Prueba otro filtro." : "Aquí aparecen los chats de WhatsApp (por Zapier) y de Instagram y Facebook (por Zernio) en cuanto los conectes."}
               </div>
             )}
           </div>
