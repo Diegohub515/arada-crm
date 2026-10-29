@@ -134,10 +134,13 @@ export async function POST(req: Request) {
 
     if (String(p.solo_registrar ?? "").toLowerCase() === "true" || p.solo_registrar === true) {
       // Para el bot de Zapier: si debe callarse, lo que ya aprendió y el nombre del cliente si lo sabemos
-      const [{ data: lecciones }, { data: lead }] = await Promise.all([
+      const [{ data: lecciones }, { data: lead }, { data: config }] = await Promise.all([
         db.from("agente_lecciones").select("texto, categoria").eq("estado", "aprobada").order("created_at").limit(60),
         conv.lead_id ? db.from("leads").select("nombre").eq("id", conv.lead_id).maybeSingle() : Promise.resolve({ data: null }),
+        db.from("agente_config").select("activo").eq("id", 1).maybeSingle(),
       ]);
+      // Interruptor general en Agente IA: si está apagado, el bot de Zapier no contesta a nadie
+      const apagadoGeneral = (config as any)?.activo === false;
       let textoLecciones = "";
       for (const l of lecciones ?? []) {
         const linea = `- (${l.categoria}) ${l.texto}\n`;
@@ -145,7 +148,7 @@ export async function POST(req: Request) {
         textoLecciones += linea;
       }
       return NextResponse.json({
-        responder: false, respuesta: "", lead_id: conv.lead_id, bot_pausado: botPausado,
+        responder: false, respuesta: "", lead_id: conv.lead_id, bot_pausado: botPausado || apagadoGeneral,
         nombre_cliente: nombreReal((lead as any)?.nombre) ? (lead as any).nombre : "",
         lecciones: textoLecciones,
       });

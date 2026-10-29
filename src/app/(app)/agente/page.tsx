@@ -54,7 +54,7 @@ export default function Agente() {
     if (error) return avisar(`No se guardó: ${error.message}`);
     setConfig(nuevo);
     setOriginal(JSON.stringify(nuevo));
-    avisar(cambios && "activo" in cambios ? (nuevo.activo ? "Agente encendido" : "Agente apagado") : "Prompt guardado");
+    avisar(cambios && "activo" in cambios ? (nuevo.activo ? "Bot de WhatsApp encendido" : "Bot de WhatsApp apagado: solo contestan los asesores") : "Prompt guardado");
   }
 
   async function probar() {
@@ -87,7 +87,7 @@ export default function Agente() {
           <label className="interruptor" htmlFor="agente-activo">
             <input id="agente-activo" type="checkbox" checked={config.activo} disabled={guardando}
               onChange={(e) => guardar({ activo: e.target.checked })} />
-            {config.activo ? "Encendido" : "Apagado"}
+            Bot de WhatsApp: {config.activo ? "Encendido" : "Apagado"}
           </label>
         )}
       </Barra>
@@ -99,7 +99,7 @@ export default function Agente() {
             <div className="rejilla rejilla-3">
               <div className="tarjeta kpi"><div className="kpi-titulo">Estado</div>
                 <div className="kpi-valor" style={{ fontSize: 20 }}>
-                  <span className={`pastilla ${config.activo ? "bien" : "aviso"}`}>{config.activo ? "Contestando chats" : "Apagado"}</span>
+                  <span className={`pastilla ${config.activo ? "bien" : "aviso"}`}>{config.activo ? "Contestando chats" : "Apagado: solo contestan los asesores"}</span>
                 </div>
               </div>
               <div className="tarjeta kpi"><div className="kpi-titulo">Mensajes enviados (30 días)</div><div className="kpi-valor">{stats?.enviados ?? "—"}</div></div>
