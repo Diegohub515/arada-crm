@@ -65,7 +65,8 @@ export async function POST(req: Request) {
     const nombre =
       buscarCampo(plano, "nombre_completo", "full_name", "nombre", "name") ??
       [buscarCampo(plano, "first_name", "primer_nombre"), buscarCampo(plano, "last_name", "apellido")].filter(Boolean).join(" ");
-    const presupuestoTxt = buscarCampo(plano, "presupuesto", "budget");
+    // Solo el campo exacto: "rango_presupuesto" (texto como "3 a 4 millones") no es un número
+    const presupuestoTxt = plano.presupuesto ?? plano.budget ?? null;
     const r = await guardarLead(db, {
       nombre,
       telefono: buscarCampo(plano, "telefono", "phone_number", "phone", "celular", "whatsapp"),
