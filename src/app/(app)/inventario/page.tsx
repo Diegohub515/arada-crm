@@ -17,7 +17,7 @@ type Unidad = {
 const ESTADOS_UNIDAD = [
   { id: "disponible", nombre: "Disponible", tono: "bien" },
   { id: "separada", nombre: "Separada", tono: "aviso" },
-  { id: "vendida", nombre: "Vendida", tono: "acento" },
+  { id: "vendida", nombre: "Vendida", tono: "info" },
   { id: "bloqueada", nombre: "Bloqueada", tono: "neutro" },
 ];
 const tono = (e: string) => ESTADOS_UNIDAD.find((x) => x.id === e)?.tono ?? "neutro";

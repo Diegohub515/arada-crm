@@ -115,7 +115,7 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .barra h1 { font-size: 16px; font-weight: 650; display: flex; align-items: center; gap: 8px; }
 .barra .espacio { flex: 1; }
 .contenido { padding: 24px 28px 48px; display: flex; flex-direction: column; gap: 18px; }
-.boton-menu { display: none; }
+.boton.boton-menu { display: none; }
 
 /* ---------- Piezas ---------- */
 .tarjeta { background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio); box-shadow: var(--sombra); }
@@ -313,7 +313,7 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 @media (max-width: 860px) {
   .lateral { position: fixed; left: 0; top: 0; z-index: 50; transform: translateX(-100%); transition: transform 0.2s; box-shadow: var(--sombra-flotante); }
   .lateral.abierto { transform: none; }
-  .boton-menu { display: inline-flex; }
+  .boton.boton-menu { display: inline-flex; }
   .barra { padding: 0 16px; }
   .contenido { padding: 16px 16px 40px; }
   .bandeja { grid-template-columns: minmax(0, 1fr); }
@@ -339,7 +339,7 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 /* ---------- Comercialización ---------- */
 .punto { display: inline-block; width: 9px; height: 9px; border-radius: 3px; background: var(--texto-3); }
 .punto.bien { background: var(--bien); } .punto.aviso { background: var(--aviso); }
-.punto.acento { background: var(--acento); } .punto.neutro { background: var(--texto-3); }
+.punto.acento { background: var(--acento); } .punto.info { background: var(--info); } .punto.neutro { background: var(--texto-3); }
 .filtro-kpi { text-align: left; cursor: pointer; font: inherit; color: inherit; }
 .filtro-kpi:hover { border-color: var(--acento); }
 .filtro-kpi.activo { border-color: var(--acento); box-shadow: 0 0 0 3px var(--acento-suave); }
@@ -358,7 +358,7 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 .depa:hover { box-shadow: var(--sombra-flotante); transform: translateY(-1px); }
 .depa.disponible { border-left-color: var(--bien); background: var(--bien-suave); }
 .depa.separada { border-left-color: var(--aviso); background: var(--aviso-suave); }
-.depa.vendida { border-left-color: var(--acento); background: var(--superficie-2); opacity: 0.8; }
+.depa.vendida { border-left-color: var(--info); background: var(--info-suave); opacity: 0.85; }
 .depa.bloqueada { border-left-color: var(--texto-3); background: repeating-linear-gradient(-45deg, var(--superficie-2) 0 6px, var(--superficie) 6px 12px); }
 .leyenda { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--texto-2); }
 .leyenda span { display: inline-flex; align-items: center; gap: 6px; }
