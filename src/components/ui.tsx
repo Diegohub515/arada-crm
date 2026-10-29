@@ -49,18 +49,43 @@ export function IconoRed({ plataforma }: { plataforma: string | null }) {
   return <span className={`red ${clase}`} title={plataforma ?? ""}>{letra}</span>;
 }
 
+export type TablaOpciones =
+  | "perfiles" | "brokers" | "proveedores" | "ordenes_compra"
+  | "unidades" | "leads" | "cotizaciones" | "separaciones";
+
+const SELECCION: Record<TablaOpciones, string> = {
+  perfiles: "id, nombre, email",
+  brokers: "id, nombre",
+  proveedores: "id, nombre",
+  ordenes_compra: "id, concepto, folio",
+  unidades: "id, desarrollo, torre, numero, tipologia, estado",
+  leads: "id, nombre, telefono",
+  cotizaciones: "id, folio, precio_final, unidades(torre, numero), leads(nombre)",
+  separaciones: "id, monto, estado, unidades(torre, numero), leads(nombre)",
+};
+
+function etiquetaOpcion(tabla: TablaOpciones, r: any): string {
+  switch (tabla) {
+    case "ordenes_compra": return `${r.folio ? r.folio + " · " : ""}${r.concepto}`;
+    case "perfiles": return r.nombre || r.email || "Sin nombre";
+    case "unidades": return `${r.desarrollo} ${r.torre}-${r.numero}${r.tipologia ? " · " + r.tipologia : ""} (${r.estado})`;
+    case "leads": return `${r.nombre}${r.telefono ? " · " + r.telefono : ""}`;
+    case "cotizaciones": return `${r.folio ?? "COT"} · ${r.unidades ? r.unidades.torre + "-" + r.unidades.numero : ""} · ${r.leads?.nombre ?? "sin cliente"}`;
+    case "separaciones": return `${r.unidades ? r.unidades.torre + "-" + r.unidades.numero : ""} · ${r.leads?.nombre ?? "sin cliente"} (${r.estado})`;
+    default: return r.nombre || "Sin nombre";
+  }
+}
+
 /** Lista simple {id, nombre} de una tabla, para los selectores. */
-export function useOpciones(tabla: "perfiles" | "brokers" | "proveedores" | "ordenes_compra") {
-  const [opciones, setOpciones] = useState<{ id: string; nombre: string }[]>([]);
+export function useOpciones(tabla: TablaOpciones | null) {
+  const [opciones, setOpciones] = useState<{ id: string; nombre: string; fila?: any }[]>([]);
   useEffect(() => {
-    const campo = tabla === "ordenes_compra" ? "id, nombre:concepto, folio" : tabla === "perfiles" ? "id, nombre, email" : "id, nombre";
-    supabaseNavegador().from(tabla).select(campo).then(({ data }) => {
-      setOpciones(
-        ((data ?? []) as any[]).map((r) => ({
-          id: r.id,
-          nombre: tabla === "ordenes_compra" ? `${r.folio ? r.folio + " · " : ""}${r.nombre}` : r.nombre || r.email || "Sin nombre",
-        }))
-      );
+    if (!tabla) return;
+    let q = supabaseNavegador().from(tabla).select(SELECCION[tabla]);
+    if (tabla === "leads") q = q.order("created_at", { ascending: false }).limit(1000);
+    if (tabla === "unidades") q = q.order("torre").order("nivel").order("numero");
+    q.then(({ data }: { data: any[] | null }) => {
+      setOpciones((data ?? []).map((r) => ({ id: r.id, nombre: etiquetaOpcion(tabla, r), fila: r })));
     });
   }, [tabla]);
   return opciones;

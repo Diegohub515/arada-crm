@@ -6,6 +6,7 @@ CRM de Arada para la preventa de Vivia Roma y Vivia Santa Catarina.
 - **Pipeline** por etapas (nuevo → contactado → cita en showroom → apartado → cerrado / perdido), arrastrando tarjetas.
 - **Bandeja** para contestar WhatsApp, Instagram y Messenger desde el CRM (vía [Zernio](https://zernio.com)).
 - **Brokers**, **proveedores**, **órdenes de compra**, **facturas** (con PDF/XML) y **documentos**.
+- **Comercialización**: inventario de departamentos en tablero por torre y nivel (disponible, separado, vendido, bloqueado), importador de lista de precios desde Excel, cotizador con plan de pagos 15/15/70 (PDF y texto para WhatsApp), separaciones con comprobante y ventas con comisión de broker. El estado del departamento y la etapa del lead se actualizan solos.
 - **Agente IA** que contesta solo los chats: califica al lead, guarda sus datos, ofrece visita al showroom y pasa el chat a una persona cuando hace falta. Su prompt se edita en el CRM (menú **Agente IA**) y se puede pausar en general o por chat.
 - **IA de apoyo**: sugiere respuestas, propone el siguiente paso de cada lead y analiza tus gastos.
 
@@ -90,7 +91,7 @@ Estructura:
 
 ```
 supabase/schema.sql          tablas, seguridad y bucket de archivos
-src/app/(app)/               pantallas: dashboard, leads, pipeline, bandeja, brokers, proveedores, ordenes, facturas, documentos, configuracion
+src/app/(app)/               pantallas: dashboard, leads, pipeline, bandeja, agente, inventario, cotizaciones, separaciones, ventas, brokers, proveedores, ordenes, facturas, documentos, configuracion
 src/app/api/webhooks/        entrada de Zernio y de leads (Meta, Google, Zapier, landings)
 src/app/api/mensajes/enviar  envía respuestas por Zernio
 src/app/api/ia               sugerencias y análisis con IA

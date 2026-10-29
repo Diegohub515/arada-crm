@@ -245,3 +245,162 @@ insert into public.agente_config (id) values (1) on conflict (id) do nothing;
 alter table public.agente_config enable row level security;
 drop policy if exists equipo_todo on public.agente_config;
 create policy equipo_todo on public.agente_config for all to authenticated using (true) with check (true);
+
+-- =====================================================================
+-- Comercialización: inventario, cotizaciones, separaciones y ventas.
+-- Seguro correrlo otra vez.
+-- =====================================================================
+create table if not exists public.unidades (
+  id uuid primary key default gen_random_uuid(),
+  desarrollo text not null default 'VRO',
+  torre text not null default 'A',
+  nivel int not null,
+  numero text not null,
+  tipologia text,
+  recamaras int,
+  banos numeric(3,1),
+  m2_interior numeric(8,2),
+  m2_terraza numeric(8,2),
+  cajones int default 1,
+  vista text,
+  precio_lista numeric(14,2) not null default 0,
+  estado text not null default 'disponible' check (estado in ('disponible','separada','vendida','bloqueada')),
+  notas text,
+  created_at timestamptz not null default now(),
+  unique (desarrollo, torre, numero)
+);
+
+create table if not exists public.cotizaciones (
+  id uuid primary key default gen_random_uuid(),
+  folio text,
+  unidad_id uuid not null references public.unidades(id) on delete cascade,
+  lead_id uuid references public.leads(id) on delete set null,
+  asesor_id uuid references public.perfiles(id) on delete set null,
+  precio_lista numeric(14,2) not null,
+  descuento_pct numeric(5,2) not null default 0,
+  precio_final numeric(14,2) not null,
+  enganche_pct numeric(5,2) not null default 15,
+  mensualidades_pct numeric(5,2) not null default 15,
+  num_mensualidades int not null default 12,
+  escrituracion_pct numeric(5,2) not null default 70,
+  vigencia date,
+  estado text not null default 'vigente' check (estado in ('vigente','aceptada','vencida','cancelada')),
+  notas text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.separaciones (
+  id uuid primary key default gen_random_uuid(),
+  unidad_id uuid not null references public.unidades(id) on delete cascade,
+  lead_id uuid references public.leads(id) on delete set null,
+  cotizacion_id uuid references public.cotizaciones(id) on delete set null,
+  monto numeric(14,2) not null default 0,
+  fecha date not null default current_date,
+  vence date,
+  metodo_pago text,
+  estado text not null default 'activa' check (estado in ('activa','convertida','cancelada','vencida')),
+  archivo_path text,
+  notas text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.ventas (
+  id uuid primary key default gen_random_uuid(),
+  unidad_id uuid not null references public.unidades(id) on delete cascade,
+  lead_id uuid references public.leads(id) on delete set null,
+  separacion_id uuid references public.separaciones(id) on delete set null,
+  cotizacion_id uuid references public.cotizaciones(id) on delete set null,
+  broker_id uuid references public.brokers(id) on delete set null,
+  precio_final numeric(14,2) not null,
+  fecha_contrato date not null default current_date,
+  comision_broker_pct numeric(5,2),
+  estado text not null default 'firmada' check (estado in ('firmada','escriturada','cancelada')),
+  archivo_path text,
+  notas text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists cotizaciones_unidad_idx on public.cotizaciones (unidad_id);
+create index if not exists separaciones_unidad_idx on public.separaciones (unidad_id);
+create index if not exists ventas_unidad_idx on public.ventas (unidad_id);
+
+-- Folio automático de cotización: COT-0001
+create sequence if not exists public.cotizaciones_folio_seq;
+create or replace function public.folio_cotizacion()
+returns trigger language plpgsql as $$
+begin
+  if new.folio is null then new.folio := 'COT-' || lpad(nextval('public.cotizaciones_folio_seq')::text, 4, '0'); end if;
+  return new;
+end $$;
+drop trigger if exists cotizacion_folio on public.cotizaciones;
+create trigger cotizacion_folio before insert on public.cotizaciones for each row execute function public.folio_cotizacion();
+
+-- El estado del departamento se calcula solo a partir de separaciones y ventas
+create or replace function public.recalcular_unidad(p_unidad uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare actual text;
+begin
+  select estado into actual from unidades where id = p_unidad;
+  if actual is null then return; end if;
+  if exists (select 1 from ventas where unidad_id = p_unidad and estado <> 'cancelada') then
+    update unidades set estado = 'vendida' where id = p_unidad;
+  elsif exists (select 1 from separaciones where unidad_id = p_unidad and estado = 'activa') then
+    update unidades set estado = 'separada' where id = p_unidad;
+  elsif actual in ('separada','vendida') then
+    update unidades set estado = 'disponible' where id = p_unidad;
+  end if;
+end $$;
+
+create or replace function public.al_cambiar_separacion()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'DELETE' then perform recalcular_unidad(old.unidad_id); return old; end if;
+  perform recalcular_unidad(new.unidad_id);
+  if tg_op = 'UPDATE' and old.unidad_id <> new.unidad_id then perform recalcular_unidad(old.unidad_id); end if;
+  if new.estado = 'activa' and new.lead_id is not null then
+    update leads set etapa = 'apartado' where id = new.lead_id and etapa not in ('apartado','cerrado');
+    if tg_op = 'INSERT' then
+      insert into actividades (lead_id, tipo, texto) values (new.lead_id, 'sistema', 'Separó un departamento por $' || to_char(new.monto, 'FM999,999,999') || '.');
+    end if;
+  end if;
+  if new.cotizacion_id is not null and new.estado = 'activa' then
+    update cotizaciones set estado = 'aceptada' where id = new.cotizacion_id;
+  end if;
+  return new;
+end $$;
+drop trigger if exists separacion_cambio on public.separaciones;
+create trigger separacion_cambio after insert or update or delete on public.separaciones
+  for each row execute function public.al_cambiar_separacion();
+
+create or replace function public.al_cambiar_venta()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'DELETE' then perform recalcular_unidad(old.unidad_id); return old; end if;
+  if new.separacion_id is not null and new.estado <> 'cancelada' then
+    update separaciones set estado = 'convertida' where id = new.separacion_id and estado = 'activa';
+  end if;
+  perform recalcular_unidad(new.unidad_id);
+  if tg_op = 'UPDATE' and old.unidad_id <> new.unidad_id then perform recalcular_unidad(old.unidad_id); end if;
+  if new.estado <> 'cancelada' and new.lead_id is not null then
+    update leads set etapa = 'cerrado', valor_operacion = new.precio_final,
+      broker_id = coalesce(new.broker_id, broker_id) where id = new.lead_id;
+    if tg_op = 'INSERT' then
+      insert into actividades (lead_id, tipo, texto) values (new.lead_id, 'sistema', 'Venta firmada por $' || to_char(new.precio_final, 'FM999,999,999') || '.');
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists venta_cambio on public.ventas;
+create trigger venta_cambio after insert or update or delete on public.ventas
+  for each row execute function public.al_cambiar_venta();
+
+do $$
+declare t text;
+begin
+  foreach t in array array['unidades','cotizaciones','separaciones','ventas'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists equipo_todo on public.%I', t);
+    execute format('create policy equipo_todo on public.%I for all to authenticated using (true) with check (true)', t);
+  end loop;
+  begin alter publication supabase_realtime add table public.unidades; exception when others then null; end;
+end $$;

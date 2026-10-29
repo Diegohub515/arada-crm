@@ -73,7 +73,7 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .lateral {
   width: var(--lateral); flex-shrink: 0; background: var(--superficie);
   border-right: 1px solid var(--borde); display: flex; flex-direction: column;
-  position: sticky; top: 0; height: 100vh; padding: 18px 14px; gap: 18px;
+  position: sticky; top: 0; height: 100vh; padding: 18px 14px; gap: 14px; overflow-y: auto;
 }
 .marca { display: flex; align-items: center; gap: 10px; padding: 2px 6px; }
 .marca-logo {
@@ -335,3 +335,43 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 .interruptor input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
 .interruptor input:checked { background: var(--acento); }
 .interruptor input:checked::after { transform: translateX(18px); }
+
+/* ---------- Comercialización ---------- */
+.punto { display: inline-block; width: 9px; height: 9px; border-radius: 3px; background: var(--texto-3); }
+.punto.bien { background: var(--bien); } .punto.aviso { background: var(--aviso); }
+.punto.acento { background: var(--acento); } .punto.neutro { background: var(--texto-3); }
+.filtro-kpi { text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.filtro-kpi:hover { border-color: var(--acento); }
+.filtro-kpi.activo { border-color: var(--acento); box-shadow: 0 0 0 3px var(--acento-suave); }
+.torre-caja { overflow-x: auto; display: flex; flex-direction: column; gap: 14px; }
+.torre { display: flex; flex-direction: column; gap: 6px; min-width: max-content; }
+.torre-nivel { display: grid; grid-template-columns: 64px auto; gap: 8px; align-items: stretch; }
+.torre-etiqueta { display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--texto-3); background: var(--superficie-2); border-radius: 8px; }
+.torre-unidades { display: flex; gap: 6px; }
+.depa {
+  width: 92px; padding: 8px 8px 7px; border-radius: 9px; border: 1px solid var(--borde); text-align: left; cursor: pointer;
+  display: flex; flex-direction: column; gap: 1px; font: inherit; color: var(--texto); background: var(--superficie);
+  border-left-width: 4px;
+}
+.depa b { font-size: 13.5px; }
+.depa small { font-size: 11px; color: var(--texto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.depa:hover { box-shadow: var(--sombra-flotante); transform: translateY(-1px); }
+.depa.disponible { border-left-color: var(--bien); background: var(--bien-suave); }
+.depa.separada { border-left-color: var(--aviso); background: var(--aviso-suave); }
+.depa.vendida { border-left-color: var(--acento); background: var(--superficie-2); opacity: 0.8; }
+.depa.bloqueada { border-left-color: var(--texto-3); background: repeating-linear-gradient(-45deg, var(--superficie-2) 0 6px, var(--superficie) 6px 12px); }
+.leyenda { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--texto-2); }
+.leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.datos-depa { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.datos-depa div { background: var(--superficie-2); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; }
+.datos-depa small { color: var(--texto-3); font-size: 11.5px; }
+.plan-pagos { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--borde); border-radius: 10px; overflow: hidden; }
+.plan-pagos > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--borde); }
+.plan-pagos > div:last-child { border-bottom: 0; background: var(--superficie-2); font-weight: 700; }
+.plan-pagos small { color: var(--texto-3); display: block; }
+@media (max-width: 520px) { .datos-depa { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media print {
+  .lateral, .barra, .no-imprimir, .velo > .ventana > .ventana-cabeza button { display: none !important; }
+  .velo { position: static; background: none; padding: 0; }
+  .ventana { box-shadow: none; width: 100%; }
+}

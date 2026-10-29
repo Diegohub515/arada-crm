@@ -195,6 +195,7 @@ export function FichaLead({ id, onCerrar }: { id: string; onCerrar: () => void }
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {conv && <Link className="boton" href={`/bandeja?c=${conv.id}`}><MessageCircle size={15} /> Abrir chat</Link>}
         {lead.telefono && <span className="boton" style={{ cursor: "text", userSelect: "all" }}>{lead.telefono}</span>}
+        <Link className="boton" href={`/cotizaciones?nuevo=1&lead_id=${lead.id}`}>Cotizar depto.</Link>
         <button className="boton" onClick={analizar}><Sparkles size={15} /> Siguiente paso con IA</button>
       </div>
       {ia && (ia.cargando ? <div className="ia-caja">Pensando…</div> : ia.error ? <div className="error-caja">{ia.error}</div> : <div className="ia-caja">{ia.texto}</div>)}

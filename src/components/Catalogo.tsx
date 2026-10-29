@@ -8,7 +8,8 @@ import { Ventana, useOpciones, useToast, abrirArchivo, subirArchivo } from "./ui
 export type Campo = {
   nombre: string;
   etiqueta: string;
-  tipo?: "texto" | "numero" | "fecha" | "lista" | "notas" | "archivo" | "booleano" | "brokers" | "proveedores" | "ordenes";
+  tipo?: "texto" | "numero" | "fecha" | "lista" | "notas" | "archivo" | "booleano" | "brokers" | "proveedores" | "ordenes"
+    | "unidades" | "leads" | "cotizaciones" | "separaciones";
   opciones?: { id: string; nombre: string }[];
   ancho?: boolean;
   requerido?: boolean;
@@ -46,9 +47,14 @@ export default function Catalogo<T extends { id: string; archivo_path?: string |
   const [confirmarBorrar, setConfirmarBorrar] = useState(false);
   const [toast, avisar] = useToast();
 
-  const brokers = useOpciones("brokers");
-  const proveedores = useOpciones("proveedores");
-  const ordenes = useOpciones("ordenes_compra");
+  const usa = (t: Campo["tipo"]) => p.campos.some((c) => c.tipo === t);
+  const brokers = useOpciones(usa("brokers") ? "brokers" : null);
+  const proveedores = useOpciones(usa("proveedores") ? "proveedores" : null);
+  const ordenes = useOpciones(usa("ordenes") ? "ordenes_compra" : null);
+  const unidades = useOpciones(usa("unidades") ? "unidades" : null);
+  const leadsOp = useOpciones(usa("leads") ? "leads" : null);
+  const cotizaciones = useOpciones(usa("cotizaciones") ? "cotizaciones" : null);
+  const separaciones = useOpciones(usa("separaciones") ? "separaciones" : null);
 
   const campoOrden = p.orden?.campo ?? "created_at";
   const ascendente = !!p.orden?.asc;
@@ -59,6 +65,21 @@ export default function Catalogo<T extends { id: string; archivo_path?: string |
   }, [db, p.tabla, p.seleccion, campoOrden, ascendente]);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  // ?nuevo=1&unidad_id=…&lead_id=… abre el formulario ya llenado (lo usan Inventario y Cotizaciones)
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (!sp.get("nuevo")) return;
+    const base: Record<string, unknown> = {};
+    p.campos.forEach((c) => {
+      if (c.porDefecto !== undefined) base[c.nombre] = c.porDefecto;
+      const v = sp.get(c.nombre);
+      if (v != null) base[c.nombre] = v;
+    });
+    setEditando(base as Partial<T>);
+    window.history.replaceState(null, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const visibles = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -122,7 +143,9 @@ export default function Catalogo<T extends { id: string; archivo_path?: string |
   }
 
   const opcionesDe = (c: Campo) =>
-    c.tipo === "brokers" ? brokers : c.tipo === "proveedores" ? proveedores : c.tipo === "ordenes" ? ordenes : c.opciones ?? [];
+    c.tipo === "brokers" ? brokers : c.tipo === "proveedores" ? proveedores : c.tipo === "ordenes" ? ordenes
+      : c.tipo === "unidades" ? unidades : c.tipo === "leads" ? leadsOp : c.tipo === "cotizaciones" ? cotizaciones
+      : c.tipo === "separaciones" ? separaciones : c.opciones ?? [];
 
   const valor = (c: Campo) => {
     const v = (editando as any)?.[c.nombre];
@@ -212,7 +235,7 @@ export default function Catalogo<T extends { id: string; archivo_path?: string |
                   <select id={`c-${c.nombre}`} className="entrada" value={valor(c) === "false" ? "false" : "true"} onChange={(e) => poner(c.nombre, e.target.value === "true")}>
                     <option value="true">Sí</option><option value="false">No</option>
                   </select>
-                ) : c.tipo && ["lista", "brokers", "proveedores", "ordenes"].includes(c.tipo) ? (
+                ) : c.tipo && ["lista", "brokers", "proveedores", "ordenes", "unidades", "leads", "cotizaciones", "separaciones"].includes(c.tipo) ? (
                   <select id={`c-${c.nombre}`} className="entrada" value={valor(c)} required={c.requerido} onChange={(e) => poner(c.nombre, e.target.value)}>
                     <option value="">—</option>
                     {opcionesDe(c).map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, Columns3, MessageCircle, Handshake, Truck, ClipboardList,
-  Receipt, FolderOpen, Settings, LogOut, Menu, Bot,
+  Receipt, FolderOpen, Settings, LogOut, Menu, Bot, Building2, FileText, BadgeDollarSign,
 } from "lucide-react";
 import { supabaseNavegador } from "@/lib/supabase/client";
 import { iniciales } from "@/lib/formato";
@@ -21,6 +21,15 @@ const SECCIONES = [
       { href: "/bandeja", nombre: "Bandeja", icono: MessageCircle, contador: true },
       { href: "/agente", nombre: "Agente IA", icono: Bot },
       { href: "/brokers", nombre: "Brokers", icono: Handshake },
+    ],
+  },
+  {
+    titulo: "Comercialización",
+    items: [
+      { href: "/inventario", nombre: "Inventario", icono: Building2 },
+      { href: "/cotizaciones", nombre: "Cotizaciones", icono: FileText },
+      { href: "/separaciones", nombre: "Separaciones", icono: Handshake },
+      { href: "/ventas", nombre: "Ventas", icono: BadgeDollarSign },
     ],
   },
   {
