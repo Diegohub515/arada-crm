@@ -110,5 +110,11 @@ async function importarChat(db: ReturnType<typeof supabaseAdmin>, accountId: str
   if (ultimo && antesDe === Infinity) {
     await db.from("conversaciones").update({ ultimo_mensaje: ultimo.texto, ultimo_mensaje_at: ultimo.fecha }).eq("id", conv!.id);
   }
+  // Lead creado por la importación: su fecha es la del primer mensaje del chat, no la de hoy
+  if (conv!.lead_id) {
+    const { data: pm } = await db.from("mensajes").select("created_at").eq("conversacion_id", conv!.id)
+      .order("created_at", { ascending: true }).limit(1).maybeSingle();
+    if (pm) await db.from("leads").update({ created_at: pm.created_at }).eq("id", conv!.lead_id).ilike("notas", "%importado del historial%").gt("created_at", pm.created_at);
+  }
   return total;
 }

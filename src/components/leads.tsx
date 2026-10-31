@@ -12,10 +12,17 @@ export function useLeads() {
   const [leads, setLeads] = useState<Lead[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const cargar = useCallback(async () => {
-    const { data, error } = await supabaseNavegador()
-      .from("leads").select("*").order("created_at", { ascending: false }).limit(2000);
-    if (error) setError(error.message);
-    else setLeads(data as Lead[]);
+    // Supabase entrega máximo 1000 por consulta: se piden por páginas hasta tenerlos todos
+    const db = supabaseNavegador();
+    const todos: Lead[] = [];
+    for (let desde = 0; desde < 50000; desde += 1000) {
+      const { data, error } = await db.from("leads").select("*")
+        .order("created_at", { ascending: false }).order("id").range(desde, desde + 999);
+      if (error) return setError(error.message);
+      todos.push(...((data ?? []) as Lead[]));
+      if (!data || data.length < 1000) break;
+    }
+    setLeads(todos);
   }, []);
   useEffect(() => {
     cargar();
