@@ -185,7 +185,7 @@ async function procesarLead(db: ReturnType<typeof supabaseAdmin>, p: any) {
     originales: p,
     extra: {
       primer_contacto: "Formulario",
-      como_se_entero: l.organico ? "Facebook (orgánico)" : "Facebook / Instagram",
+      como_se_entero: "Meta",
       motivo_compra: campo("motivo", "proposito"),
       tiempo_compra: campo("tiempo", "cuando"),
       rango_presupuesto: campo("presupuesto", "budget"),
