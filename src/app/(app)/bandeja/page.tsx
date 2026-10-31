@@ -269,7 +269,7 @@ function Chat({ conv, onVolver }: { conv: ConvConLead; onVolver: () => void }) {
         <span className="avatar">{iniciales(nombre)}</span>
         <div>
           <b style={{ display: "flex", gap: 6, alignItems: "center" }}><IconoRed plataforma={conv.plataforma} /> {nombre}</b>
-          <small>{conv.contacto_id ?? conv.plataforma ?? ""}</small>
+          <small>{String(conv.zernio_conversation_id ?? "").startsWith("com:") ? `Comentario en publicación de ${conv.plataforma ?? ""}` : conv.contacto_id ?? conv.plataforma ?? ""}</small>
         </div>
         {conv.leads && <PastillaEtapa etapa={conv.leads.etapa} />}
         <button className={`boton chico ${agente ? "agente-on" : ""}`} onClick={alternarAgente}
@@ -292,7 +292,7 @@ function Chat({ conv, onVolver }: { conv: ConvConLead; onVolver: () => void }) {
             <div key={m.id} className={`globo ${m.direccion} ${m.estado === "error" ? "error" : ""}`}>
               {m.autor === "agente" && <span className="autor-agente"><Bot size={11} /> Agente IA</span>}
               {m.texto}
-              {(m.adjuntos ?? []).map((a, i) => a?.url ? <div key={i}><a href={a.url} target="_blank" rel="noopener noreferrer">Ver {a.type ?? "archivo"}</a></div> : null)}
+              {(m.adjuntos ?? []).map((a: any, i) => a?.url ? <div key={i}><a href={a.url} target="_blank" rel="noopener noreferrer">{a.type === "publicacion" ? `Ver publicación${a.texto ? `: “${String(a.texto).slice(0, 60)}…”` : ""}` : `Ver ${a.type ?? "archivo"}`}</a></div> : null)}
               <small>{hora(m.created_at)}{m.estado === "error" ? " · no enviado" : ""}
                 {m.autor === "agente" && (
                   <span className="feedback-bot">

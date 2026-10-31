@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { supabaseServidor } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { enviarMensaje, marcarLeida } from "@/lib/zernio";
+import { enviarMensaje, marcarLeida, responderComentario } from "@/lib/zernio";
 import { telefonoWhatsApp } from "@/lib/formato";
 import { enlazarConZernio, whatsappPorZernio } from "@/lib/whatsapp";
 
@@ -26,6 +26,11 @@ export async function POST(req: Request) {
     .eq("id", conversacionId)
     .single();
   if (!conv) return NextResponse.json({ error: "No encontré esa conversación" }, { status: 404 });
+
+  // Comentarios en publicaciones: la respuesta se publica como respuesta al comentario
+  if (String(conv.zernio_conversation_id ?? "").startsWith("com:")) {
+    return responderEnComentario(db, conv, texto.trim(), auth.user.id);
+  }
 
   // Chats de WhatsApp guardados como "wa:…" (entraron por Zapier)
   if (String(conv.zernio_conversation_id ?? "").startsWith("wa:")) {
@@ -139,4 +144,29 @@ async function enviarPorZapier(
     await db.from("actividades").insert({ lead_id: conv.lead_id, tipo: "whatsapp", texto: `Respuesta enviada: ${texto}`, creado_por: usuarioId });
   }
   return NextResponse.json({ ok: true, aviso: null });
+}
+
+async function responderEnComentario(
+  db: ReturnType<typeof supabaseAdmin>,
+  conv: { id: string; zernio_conversation_id: string; zernio_account_id: string | null; lead_id: string | null },
+  texto: string,
+  usuarioId: string,
+) {
+  const postId = conv.zernio_conversation_id.split(":")[1];
+  if (!postId || !conv.zernio_account_id) return NextResponse.json({ error: "No sé a qué publicación pertenece este comentario." }, { status: 400 });
+  const { data: ultimo } = await db.from("mensajes").select("zernio_message_id").eq("conversacion_id", conv.id)
+    .eq("direccion", "entrante").order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const commentId = String(ultimo?.zernio_message_id ?? "").replace(/^com:/, "") || null;
+  try {
+    const r = await responderComentario({ postId, accountId: conv.zernio_account_id, texto, commentId, idempotencia: crypto.randomUUID() });
+    const ahora = new Date().toISOString();
+    await db.from("mensajes").insert({
+      conversacion_id: conv.id, zernio_message_id: r.commentId ? `com:${r.commentId}` : null, direccion: "saliente",
+      texto, estado: "enviado", autor: "humano", enviado_por: usuarioId, created_at: ahora,
+    });
+    await db.from("conversaciones").update({ ultimo_mensaje: `💬 ${texto}`, ultimo_mensaje_at: ahora, no_leidos: 0 }).eq("id", conv.id);
+    return NextResponse.json({ ok: true, aviso: null });
+  } catch (e: any) {
+    return NextResponse.json({ error: `No se pudo publicar la respuesta: ${e?.message ?? "error"}` }, { status: 502 });
+  }
 }

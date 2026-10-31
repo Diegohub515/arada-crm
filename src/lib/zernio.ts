@@ -107,6 +107,16 @@ export async function enviarPlantillaWhatsApp(opts: {
   };
 }
 
+/** Contesta públicamente un comentario de una publicación (Facebook / Instagram). */
+export async function responderComentario(opts: { postId: string; accountId: string; texto: string; commentId?: string | null; idempotencia: string }) {
+  const res = await llamar(`/v1/inbox/comments/${encodeURIComponent(opts.postId)}`, {
+    method: "POST",
+    idempotencia: opts.idempotencia,
+    body: JSON.stringify({ accountId: opts.accountId, message: opts.texto, ...(opts.commentId ? { commentId: opts.commentId } : {}) }),
+  });
+  return { commentId: (res?.data?.commentId as string | undefined) ?? null };
+}
+
 /** ID de la cuenta de WhatsApp conectada en Zernio (variable de entorno o la primera que encuentre). */
 let cuentaWaCache: string | null = null;
 export async function cuentaWhatsApp(): Promise<string | null> {

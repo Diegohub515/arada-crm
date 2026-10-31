@@ -41,6 +41,8 @@ export async function POST(req: Request) {
       await procesarMensaje(db, p, tipo === "message.received" ? "entrante" : "saliente");
     } else if (tipo === "lead.received") {
       await procesarLead(db, p);
+    } else if (tipo === "comment.received") {
+      await procesarComentario(db, p);
     }
     // webhook.test y demás eventos: se aceptan sin hacer nada.
     return NextResponse.json({ ok: true });
@@ -189,4 +191,67 @@ async function procesarLead(db: ReturnType<typeof supabaseAdmin>, p: any) {
       rango_presupuesto: campo("presupuesto", "budget"),
     },
   });
+}
+
+/**
+ * Comentario en una publicación de Facebook o Instagram (también las orgánicas del feed).
+ * Cada persona en cada publicación es un chat en la Bandeja: "com:<id del post>:<id de la persona>".
+ */
+async function procesarComentario(db: ReturnType<typeof supabaseAdmin>, p: any) {
+  const c = p?.comment ?? {};
+  const post = p?.post ?? {};
+  const cuenta = p?.account ?? {};
+  const postId: string | null = c.platformPostId ?? post.platformPostId ?? c.postId ?? post.id ?? null;
+  const autor = c.author ?? {};
+  if (!postId || !c.id) return;
+  const propio = autor.isOwnAccount === true;
+  const plataforma = String(c.platform ?? cuenta.platform ?? "facebook").toLowerCase();
+  const accountId = cuenta.accountId ?? cuenta.id ?? null;
+
+  // Nuestras propias respuestas: van al chat del comentario al que contestamos (si lo sabemos)
+  let clave: string;
+  if (propio) {
+    if (!c.parentCommentId) return;
+    const { data: padre } = await db.from("mensajes").select("conversacion_id").eq("zernio_message_id", `com:${c.parentCommentId}`).maybeSingle();
+    if (!padre) return;
+    const { data: conv } = await db.from("conversaciones").select("zernio_conversation_id").eq("id", padre.conversacion_id).single();
+    clave = conv!.zernio_conversation_id;
+  } else {
+    clave = `com:${postId}:${autor.id ?? autor.username ?? "anon"}`;
+  }
+
+  const nombre = autor.name || (autor.username ? `@${autor.username}` : null);
+  let { data: conv } = await db.from("conversaciones").select("id, no_leidos").eq("zernio_conversation_id", clave).maybeSingle();
+  if (!conv) {
+    const { data, error } = await db.from("conversaciones").insert({
+      zernio_conversation_id: clave, zernio_account_id: accountId, plataforma,
+      contacto_nombre: nombre, contacto_id: autor.username ?? autor.id ?? null,
+      // Los comentarios los contesta una persona (el bot no publica respuestas públicas)
+      agente_activo: false, agente_motivo: "Comentario en publicación: contesta una persona",
+    }).select("id, no_leidos").single();
+    if (error?.code === "23505") ({ data: conv } = await db.from("conversaciones").select("id, no_leidos").eq("zernio_conversation_id", clave).single());
+    else if (error) throw error;
+    else conv = data;
+  }
+
+  const texto = (c.text as string | undefined)?.trim() || (c.attachment ? "📎 Imagen o sticker" : "");
+  const fecha = c.createdAt ?? p?.timestamp ?? new Date().toISOString();
+  const { error: errMsg } = await db.from("mensajes").insert({
+    conversacion_id: conv!.id,
+    zernio_message_id: `com:${c.id}`,
+    direccion: propio ? "saliente" : "entrante",
+    texto,
+    adjuntos: [{ type: "publicacion", url: post.permalink ?? null, texto: post.content ? String(post.content).slice(0, 300) : null, imagen: post.imageUrl ?? null }],
+    estado: propio ? "enviado" : "recibido",
+    autor: propio ? "humano" : "cliente",
+    created_at: fecha,
+  });
+  if (errMsg && errMsg.code !== "23505") throw errMsg;
+  if (errMsg) return;
+
+  await db.from("conversaciones").update({
+    ultimo_mensaje: `💬 ${texto}`, ultimo_mensaje_at: fecha,
+    no_leidos: propio ? 0 : (conv!.no_leidos ?? 0) + 1,
+    ...(accountId ? { zernio_account_id: accountId } : {}),
+  }).eq("id", conv!.id);
 }
