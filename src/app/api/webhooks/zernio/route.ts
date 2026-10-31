@@ -161,15 +161,27 @@ async function procesarLead(db: ReturnType<typeof supabaseAdmin>, p: any) {
   const nombre =
     buscarCampo(c, "full_name", "nombre_completo", "nombre", "name") ??
     [buscarCampo(c, "first_name"), buscarCampo(c, "last_name")].filter(Boolean).join(" ");
+  // Desarrollo por el nombre del formulario o de la página
+  const pista = `${l.formNombre ?? ""} ${l.cuenta ?? ""}`.toLowerCase();
+  const desarrollo = /vsc|santa catarina|locales|vivia sc/.test(pista) ? "VSC" : /vro|roma/.test(pista) ? "VRO" : null;
+  const respuestas = Object.entries(c).filter(([k]) => !/^(full_name|phone_number|email)$/i.test(k));
   await guardarLead(db, {
     nombre,
     telefono: buscarCampo(c, "phone_number", "telefono", "phone", "celular", "whatsapp"),
     email: buscarCampo(c, "email", "correo"),
     origen: "meta_formulario",
-    campana: l.formId ? `Formulario ${l.formId}` : null,
+    desarrollo,
+    campana: l.formNombre ?? (l.formId ? `Formulario ${l.formId}` : null),
     tipologia: buscarCampo(c, "tipologia", "recamaras", "departamento"),
-    notas: Object.entries(c).map(([k, v]) => `${k}: ${v}`).join("\n") || null,
-    externalId: l.externalId ? `meta:${l.externalId}` : null,
+    notas: [l.formNombre && `Formulario: ${l.formNombre}`, ...respuestas.map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)].filter(Boolean).join("\n") || null,
+    externalId: l.externalId ? `ext:${l.externalId}` : null,
     originales: p,
+    extra: {
+      primer_contacto: "Formulario",
+      como_se_entero: l.organico ? "Facebook (orgánico)" : "Facebook / Instagram",
+      motivo_compra: buscarCampo(c, "motivo", "proposito"),
+      tiempo_compra: buscarCampo(c, "tiempo", "cuando"),
+      rango_presupuesto: buscarCampo(c, "presupuesto", "budget"),
+    },
   });
 }

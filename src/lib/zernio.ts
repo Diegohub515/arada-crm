@@ -215,9 +215,14 @@ export function leerEventoLead(p: any) {
     for (const [k, v] of Object.entries(campos)) mapa[k] = Array.isArray(v) ? String(v[0] ?? "") : String(v ?? "");
   }
   return {
-    externalId: primerTexto(lead.id, p?.leadId, p?.id),
-    formId: primerTexto(p?.formId, lead.formId),
-    adId: primerTexto(p?.adId, lead.adId),
+    // El id de Meta (leadgen_id) es el mismo que usa el flujo de Zapier: así no se duplica el lead
+    externalId: primerTexto(lead.leadgenId, lead.leadgen_id, p?.leadgenId, lead.id, p?.leadId),
+    formId: primerTexto(lead.formId, lead.form_id, p?.formId),
+    formNombre: primerTexto(lead.formName, lead.form_name),
+    adId: primerTexto(lead.adId, lead.ad_id, p?.adId),
+    campanaId: primerTexto(lead.campaignId, lead.campaign_id),
+    organico: lead.isOrganic === true || lead.is_organic === true,
+    cuenta: primerTexto(p?.account?.username, p?.account?.name),
     campos: mapa,
   };
 }
