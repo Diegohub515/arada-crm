@@ -164,7 +164,12 @@ async function procesarLead(db: ReturnType<typeof supabaseAdmin>, p: any) {
   // Desarrollo por el nombre del formulario o de la página
   const pista = `${l.formNombre ?? ""} ${l.cuenta ?? ""}`.toLowerCase();
   const desarrollo = /vsc|santa catarina|locales|vivia sc/.test(pista) ? "VSC" : /vro|roma/.test(pista) ? "VRO" : null;
-  const respuestas = Object.entries(c).filter(([k]) => !/^(full_name|phone_number|email)$/i.test(k));
+  // Zernio manda las opciones como "quiero_invertir" o "$450_mil": se dejan legibles
+  const legible = (v: string) => { const t = v.replace(/_/g, " ").trim(); return t ? t[0].toUpperCase() + t.slice(1) : ""; };
+  const respuestas = Object.entries(c)
+    .filter(([k, v]) => !/^(full_name|phone_number|email)$/i.test(k) && String(v ?? "").trim())
+    .map(([k, v]) => [k, legible(String(v))] as const);
+  const campo = (...claves: string[]) => { const v = buscarCampo(c, ...claves); return v ? legible(v) : null; };
   await guardarLead(db, {
     nombre,
     telefono: buscarCampo(c, "phone_number", "telefono", "phone", "celular", "whatsapp"),
@@ -179,9 +184,9 @@ async function procesarLead(db: ReturnType<typeof supabaseAdmin>, p: any) {
     extra: {
       primer_contacto: "Formulario",
       como_se_entero: l.organico ? "Facebook (orgánico)" : "Facebook / Instagram",
-      motivo_compra: buscarCampo(c, "motivo", "proposito"),
-      tiempo_compra: buscarCampo(c, "tiempo", "cuando"),
-      rango_presupuesto: buscarCampo(c, "presupuesto", "budget"),
+      motivo_compra: campo("motivo", "proposito"),
+      tiempo_compra: campo("tiempo", "cuando"),
+      rango_presupuesto: campo("presupuesto", "budget"),
     },
   });
 }
