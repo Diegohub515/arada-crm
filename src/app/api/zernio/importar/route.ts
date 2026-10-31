@@ -54,9 +54,9 @@ async function importarChat(db: ReturnType<typeof supabaseAdmin>, accountId: str
   const nombre = String(c.participantName ?? c.participant?.name ?? c.contactName ?? c.name ?? "").trim() || null;
 
   // 1. Chat en el CRM: el de Zernio, el viejo de Zapier ("wa:…") o uno nuevo
-  let { data: conv } = await db.from("conversaciones").select("id, lead_id").eq("zernio_conversation_id", idZernio).maybeSingle();
+  let { data: conv } = await db.from("conversaciones").select("id, lead_id, created_at").eq("zernio_conversation_id", idZernio).maybeSingle();
   if (!conv && telefono) {
-    const { data: vieja } = await db.from("conversaciones").select("id, lead_id").eq("zernio_conversation_id", `wa:${telefono}`).maybeSingle();
+    const { data: vieja } = await db.from("conversaciones").select("id, lead_id, created_at").eq("zernio_conversation_id", `wa:${telefono}`).maybeSingle();
     if (vieja) {
       await db.from("conversaciones").update({ zernio_conversation_id: idZernio, zernio_account_id: accountId, plataforma: "whatsapp" }).eq("id", vieja.id);
       conv = vieja;
@@ -69,7 +69,7 @@ async function importarChat(db: ReturnType<typeof supabaseAdmin>, accountId: str
     const { data: nueva, error } = await db.from("conversaciones").insert({
       zernio_conversation_id: idZernio, zernio_account_id: accountId, plataforma: "whatsapp",
       contacto_id: telefono, contacto_nombre: nombre, lead_id: lead?.id ?? null,
-    }).select("id, lead_id").single();
+    }).select("id, lead_id, created_at").single();
     if (error) throw error;
     conv = nueva;
   }
@@ -78,6 +78,9 @@ async function importarChat(db: ReturnType<typeof supabaseAdmin>, accountId: str
   const { data: primero } = await db.from("mensajes").select("created_at").eq("conversacion_id", conv!.id)
     .order("created_at", { ascending: true }).limit(1).maybeSingle();
   const antesDe = primero ? new Date(primero.created_at).getTime() - 60000 : Infinity;
+  // Si ya tiene mensajes de antes de que existiera en el CRM, su historial ya se importó: se salta (rápido)
+  const creado = (conv as any).created_at ? new Date((conv as any).created_at).getTime() : Date.now();
+  if (primero && new Date(primero.created_at).getTime() < creado - 3600000) return 0;
 
   let cursor: string | null = null;
   let total = 0;
