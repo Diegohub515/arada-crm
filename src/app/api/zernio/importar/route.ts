@@ -50,8 +50,8 @@ export async function POST(req: Request) {
 async function importarChat(db: ReturnType<typeof supabaseAdmin>, accountId: string, c: any) {
   const idZernio: string = c.id;
   if (!idZernio) return 0;
-  const telefono = normalizarTelefono(c.participantId);
-  const nombre = (c.participantName as string | undefined)?.trim() || null;
+  const telefono = normalizarTelefono(c.participantId ?? c.participant?.phone ?? c.participant?.id ?? c.participantPhone ?? c.contactPhone ?? c.phone);
+  const nombre = String(c.participantName ?? c.participant?.name ?? c.contactName ?? c.name ?? "").trim() || null;
 
   // 1. Chat en el CRM: el de Zernio, el viejo de Zapier ("wa:…") o uno nuevo
   let { data: conv } = await db.from("conversaciones").select("id, lead_id").eq("zernio_conversation_id", idZernio).maybeSingle();
@@ -64,7 +64,7 @@ async function importarChat(db: ReturnType<typeof supabaseAdmin>, accountId: str
   }
   if (!conv) {
     const lead = telefono
-      ? await guardarLead(db, { nombre, telefono, origen: "whatsapp", externalId: `zernio-conv:${idZernio}`, notas: "Chat importado del historial de WhatsApp", extra: { primer_contacto: "WhatsApp" } })
+      ? await guardarLead(db, { nombre, telefono, origen: "whatsapp", externalId: `zernio-conv:${idZernio}`, notas: "Chat importado del historial de WhatsApp", extra: { primer_contacto: "WhatsApp" }, sinAsignar: true })
       : null;
     const { data: nueva, error } = await db.from("conversaciones").insert({
       zernio_conversation_id: idZernio, zernio_account_id: accountId, plataforma: "whatsapp",
@@ -85,15 +85,15 @@ async function importarChat(db: ReturnType<typeof supabaseAdmin>, accountId: str
   do {
     const pag = await listarMensajes(idZernio, accountId, cursor);
     const filas = pag.mensajes
-      .filter((m) => new Date(m.createdAt ?? m.sentAt ?? 0).getTime() < antesDe)
+      .filter((m) => new Date(m.createdAt ?? m.sentAt ?? m.timestamp ?? 0).getTime() < antesDe)
       .map((m) => {
-        const entrante = m.direction === "incoming";
+        const entrante = /^(incoming|inbound|in|received)$/i.test(String(m.direction ?? m.type ?? "")) || m.isFromMe === false || m.fromMe === false;
         const adj = Array.isArray(m.attachments) && m.attachments.length ? m.attachments : null;
-        const texto = (m.message as string | undefined)?.trim() || (adj ? `📎 ${adj[0]?.type === "image" ? "Imagen" : adj[0]?.type === "audio" ? "Audio" : "Archivo adjunto"}` : "");
+        const texto = String(m.message ?? m.text ?? m.content ?? m.body ?? "").trim() || (adj ? `📎 ${adj[0]?.type === "image" ? "Imagen" : adj[0]?.type === "audio" ? "Audio" : "Archivo adjunto"}` : "");
         return {
-          conversacion_id: conv!.id, zernio_message_id: m.id ?? null, direccion: entrante ? "entrante" : "saliente",
+          conversacion_id: conv!.id, zernio_message_id: m.platformMessageId ?? m.id ?? m._id ?? null, direccion: entrante ? "entrante" : "saliente",
           texto, adjuntos: adj, estado: entrante ? "recibido" : "enviado", autor: entrante ? "cliente" : "humano",
-          created_at: m.createdAt ?? m.sentAt ?? new Date().toISOString(),
+          created_at: m.createdAt ?? m.sentAt ?? m.timestamp ?? new Date().toISOString(),
         };
       })
       .filter((f) => f.zernio_message_id);

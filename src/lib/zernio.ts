@@ -135,7 +135,7 @@ export async function listarConversaciones(accountId: string, cursor?: string | 
   if (cursor) qs.set("cursor", cursor);
   const res = await llamar(`/v1/inbox/conversations?${qs}`);
   return {
-    conversaciones: (res?.data ?? []) as any[],
+    conversaciones: (res?.data ?? res?.conversations ?? res?.items ?? []) as any[],
     siguiente: (res?.pagination?.nextCursor as string | null | undefined) ?? null,
     hayMas: !!res?.pagination?.hasMore,
   };
@@ -162,7 +162,7 @@ export async function listarMensajes(conversationId: string, accountId: string, 
   if (cursor) qs.set("cursor", cursor);
   const res = await llamar(`/v1/inbox/conversations/${encodeURIComponent(conversationId)}/messages?${qs}`);
   return {
-    mensajes: (res?.messages ?? res?.data ?? []) as any[],
+    mensajes: (res?.messages ?? res?.data ?? res?.items ?? []) as any[],
     siguiente: (res?.pagination?.nextCursor as string | null | undefined) ?? null,
   };
 }

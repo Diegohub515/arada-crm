@@ -21,6 +21,8 @@ export async function guardarLead(
     originales?: unknown;
     /** Otros campos de la ficha (anuncio, conjunto_anuncios, como_se_entero, etc.) */
     extra?: Record<string, unknown>;
+    /** true = no asignar por guardia (p. ej. chats viejos importados) */
+    sinAsignar?: boolean;
   }
 ): Promise<{ id: string; nuevo: boolean }> {
   const telefono = normalizarTelefono(datos.telefono);
@@ -61,7 +63,7 @@ export async function guardarLead(
   }
 
   // Asesor de guardia en este momento (si hay calendario de guardias)
-  const asignado = await asesorDeGuardia(db, datos.desarrollo || null).catch(() => null);
+  const asignado = datos.sinAsignar ? null : await asesorDeGuardia(db, datos.desarrollo || null).catch(() => null);
 
   const { data, error } = await db
     .from("leads")
