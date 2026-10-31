@@ -609,3 +609,23 @@ alter table public.cotizaciones
   add column if not exists fecha_primer_pago date,
   add column if not exists fecha_escrituracion date,
   add column if not exists apartado numeric(14,2) not null default 10000;
+
+-- =====================================================================
+-- Guardias: qué asesor recibe los leads nuevos cada día y en qué horario
+-- =====================================================================
+create table if not exists public.guardias (
+  id uuid primary key default gen_random_uuid(),
+  asesor_id uuid not null references public.perfiles(id) on delete cascade,
+  fecha date not null,
+  hora_inicio time not null,
+  hora_fin time not null,
+  desarrollo text,               -- null = todos los desarrollos
+  created_at timestamptz not null default now(),
+  check (hora_fin > hora_inicio)
+);
+create index if not exists guardias_fecha_idx on public.guardias (fecha);
+alter table public.guardias enable row level security;
+drop policy if exists equipo_todo on public.guardias;
+create policy equipo_todo on public.guardias for all to authenticated using (true) with check (true);
+alter table public.perfiles add column if not exists activo boolean not null default true;
+alter table public.perfiles add column if not exists telefono text;

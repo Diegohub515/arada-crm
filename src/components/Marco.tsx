@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, Columns3, MessageCircle, Handshake, Truck, ClipboardList,
-  Receipt, FolderOpen, Settings, LogOut, Menu, Bot, Building2, FileText, BadgeDollarSign, ListChecks, Moon, Sun, Megaphone,
+  Receipt, FolderOpen, Settings, LogOut, Menu, Bot, Building2, FileText, BadgeDollarSign, ListChecks, Moon, Sun, Megaphone, CalendarClock,
 } from "lucide-react";
 import { supabaseNavegador } from "@/lib/supabase/client";
 import { iniciales } from "@/lib/formato";
@@ -22,6 +22,7 @@ const SECCIONES = [
       { href: "/remarketing", nombre: "Remarketing", icono: Megaphone },
       { href: "/agente", nombre: "Agente IA", icono: Bot },
       { href: "/brokers", nombre: "Brokers", icono: Handshake },
+      { href: "/guardias", nombre: "Guardias", icono: CalendarClock },
     ],
   },
   {

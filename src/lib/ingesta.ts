@@ -60,9 +60,13 @@ export async function guardarLead(
     return { id: existente.id, nuevo: false };
   }
 
+  // Asesor de guardia en este momento (si hay calendario de guardias)
+  const asignado = await asesorDeGuardia(db, datos.desarrollo || null).catch(() => null);
+
   const { data, error } = await db
     .from("leads")
     .insert({
+      asesor_id: asignado?.id ?? null,
       nombre: datos.nombre?.trim() || "Sin nombre",
       telefono,
       email: datos.email?.trim() || null,
@@ -83,9 +87,37 @@ export async function guardarLead(
   await db.from("actividades").insert({
     lead_id: data.id,
     tipo: "sistema",
-    texto: `Lead creado automáticamente desde ${datos.origen}${datos.campana ? ` (${datos.campana})` : ""}.`,
+    texto: `Lead creado automáticamente desde ${datos.origen}${datos.campana ? ` (${datos.campana})` : ""}.${asignado ? ` Asignado a ${asignado.nombre} (guardia).` : ""}`,
   });
   return { id: data.id, nuevo: true };
+}
+
+/** Fecha (AAAA-MM-DD) y hora (HH:MM) actuales en Monterrey. */
+export function ahoraMonterrey() {
+  const partes = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Monterrey", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date()).map((p) => [p.type, p.value]));
+  return { fecha: `${partes.year}-${partes.month}-${partes.day}`, hora: `${partes.hour}:${partes.minute}` };
+}
+
+/**
+ * Asesor que está de guardia ahora. Si hay varios al mismo tiempo, se reparte:
+ * le toca al que lleva menos leads asignados hoy.
+ */
+export async function asesorDeGuardia(db: SupabaseClient, desarrollo: string | null): Promise<{ id: string; nombre: string } | null> {
+  const { fecha, hora } = ahoraMonterrey();
+  const { data: turnos } = await db.from("guardias")
+    .select("asesor_id, desarrollo, perfiles!inner(nombre, email, activo)")
+    .eq("fecha", fecha).lte("hora_inicio", `${hora}:00`).gt("hora_fin", `${hora}:00`);
+  const candidatos = (turnos ?? []).filter((t: any) => t.perfiles?.activo !== false && (!t.desarrollo || !desarrollo || t.desarrollo === desarrollo));
+  if (!candidatos.length) return null;
+  const ids = Array.from(new Set(candidatos.map((t: any) => t.asesor_id as string)));
+  const { data: hoy } = await db.from("leads").select("asesor_id").in("asesor_id", ids).gte("created_at", `${fecha}T00:00:00-06:00`);
+  const cuenta = new Map(ids.map((id) => [id, 0]));
+  (hoy ?? []).forEach((l: any) => cuenta.set(l.asesor_id, (cuenta.get(l.asesor_id) ?? 0) + 1));
+  const elegido = ids.sort((a, b) => (cuenta.get(a)! - cuenta.get(b)!))[0];
+  const t: any = candidatos.find((x: any) => x.asesor_id === elegido);
+  return { id: elegido, nombre: t?.perfiles?.nombre || t?.perfiles?.email || "asesor" };
 }
 
 /** Busca un valor en un mapa de respuestas usando varios nombres posibles (es/en). */
