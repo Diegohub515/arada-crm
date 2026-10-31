@@ -2,7 +2,7 @@ import { NextResponse, after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { firmaValida, leerEventoLead, leerEventoMensaje } from "@/lib/zernio";
 import { buscarCampo, guardarLead, origenDePlataforma } from "@/lib/ingesta";
-import { ejecutarAgente, revisarRespuestaExterna } from "@/lib/agente";
+import { revisarRespuestaExterna } from "@/lib/agente";
 import { botVivia } from "@/lib/bot/vivia";
 import { normalizarTelefono } from "@/lib/formato";
 
@@ -129,8 +129,8 @@ async function procesarMensaje(db: ReturnType<typeof supabaseAdmin>, p: any, dir
 
   // 4. Agente de IA: contesta después de responderle OK a Zernio (Zernio solo espera 5 s).
   if (fila && direccion === "entrante") {
-    if (esWhatsApp) after(() => botVivia(db, conversacionId!, fila.id).catch((e) => console.error("Bot Vivia:", e)));
-    else after(() => ejecutarAgente(db, conversacionId!, fila.id).catch((e) => console.error("Agente IA:", e)));
+    // El mismo bot de Vivia Roma contesta WhatsApp, Instagram y Messenger
+    after(() => botVivia(db, conversacionId!, fila.id).catch((e) => console.error("Bot Vivia:", e)));
   }
   // Alguien contestó desde el celular (WhatsApp Business) o desde Zernio: el bot se hace a un lado en ese chat.
   if (fila && direccion === "saliente" && m.enviadoPor !== "api") {
