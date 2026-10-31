@@ -481,3 +481,6 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 @media (max-width: 640px) { .resumen-cot { grid-template-columns: repeat(2, minmax(0, 1fr)); } .esquemas { grid-template-columns: 1fr; } }
 .enlace { background: none; border: 0; padding: 0; color: var(--acento-texto); text-decoration: underline; cursor: pointer; font: inherit; }
 .rejilla-kpi { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+/* Filtros por columna (Leads) */
+.tabla thead tr.fila-filtros th { padding: 6px 8px; background: var(--superficie); position: static; text-transform: none; }
+.filtro-col { height: 30px; font-size: 12.5px; padding: 4px 8px; min-width: 110px; width: 100%; font-weight: 400; }

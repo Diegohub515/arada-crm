@@ -1,7 +1,7 @@
 "use client";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Columns3, Plus, Search } from "lucide-react";
+import { Columns3, FilterX, Plus, Search } from "lucide-react";
 import { Barra } from "@/components/Marco";
 import { NuevoLead, PastillaEtapa, useLeads } from "@/components/leads";
 import { useListas } from "@/components/listas";
@@ -29,6 +29,9 @@ function Leads() {
   const [q, setQ] = useState("");
   const [etapa, setEtapa] = useState(params.get("etapa") ?? "todas");
   const [origen, setOrigen] = useState("todos");
+  const [desarrollo, setDesarrollo] = useState("todos");
+  // Filtro por columna: clave del campo → valor ("__vacio" = sin dato)
+  const [filtrosCol, setFiltrosCol] = useState<Record<string, string>>({});
   const [soloPendientes, setSoloPendientes] = useState(params.get("seguimiento") === "1");
   const [nuevo, setNuevo] = useState(false);
   const [columnas, setColumnas] = useState<string[]>(COLUMNAS_INICIALES);
@@ -52,17 +55,69 @@ function Leads() {
     try { localStorage.setItem(CLAVE, JSON.stringify(nuevas)); } catch { /* sin almacenamiento */ }
   }
 
+  const cols = columnas.map((k) => TODOS_CAMPOS.find((c) => c.k === k)).filter((c): c is CampoLead => !!c && c.k !== "nombre" && c.k !== "notas");
+
+  /** ¿El lead pasa el filtro de esta columna? */
+  function pasaColumna(l: Lead, c: CampoLead, f: string) {
+    if (!f) return true;
+    const v = (l as any)[c.k];
+    const vacio = v == null || v === "";
+    if (f === "__vacio") return vacio;
+    if (vacio) return false;
+    switch (c.tipo) {
+      case "etapa": case "lista": case "asesor": case "broker": case "desarrollo": case "origen":
+        return String(v) === f;
+      case "fecha": return String(v).slice(0, 10) >= f; // "desde"
+      case "numero": return Number(v) >= Number(f.replace(/[^\d.]/g, "") || 0); // "mínimo"
+      default: return String(v).toLowerCase().includes(f.trim().toLowerCase());
+    }
+  }
+
   const visibles = useMemo(() => {
     const t = q.trim().toLowerCase();
     return (leads ?? []).filter((l) =>
       (etapa === "todas" || l.etapa === etapa) &&
       (origen === "todos" || l.origen === origen) &&
+      (desarrollo === "todos" || (desarrollo === "__vacio" ? !l.desarrollo : l.desarrollo === desarrollo)) &&
+      cols.every((c) => pasaColumna(l, c, filtrosCol[c.k] ?? "")) &&
       (!soloPendientes || (!!l.proximo_seguimiento && l.proximo_seguimiento <= hoy && !["cerrado", "perdido"].includes(l.etapa))) &&
       (!t || `${l.nombre} ${l.telefono ?? ""} ${l.email ?? ""} ${l.campana ?? ""}`.toLowerCase().includes(t))
     );
-  }, [leads, q, etapa, origen, soloPendientes, hoy]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads, q, etapa, origen, desarrollo, soloPendientes, hoy, filtrosCol, columnas]);
 
-  const cols = columnas.map((k) => TODOS_CAMPOS.find((c) => c.k === k)).filter((c): c is CampoLead => !!c && c.k !== "nombre" && c.k !== "notas");
+  const hayFiltros = !!q || etapa !== "todas" || origen !== "todos" || desarrollo !== "todos" || soloPendientes || Object.values(filtrosCol).some(Boolean);
+  function limpiar() {
+    setQ(""); setEtapa("todas"); setOrigen("todos"); setDesarrollo("todos"); setSoloPendientes(false); setFiltrosCol({});
+  }
+
+  /** Control de filtro bajo el encabezado de cada columna. */
+  function filtroDe(c: CampoLead) {
+    const f = filtrosCol[c.k] ?? "";
+    const poner = (v: string) => setFiltrosCol((x) => ({ ...x, [c.k]: v }));
+    const sel = (opciones: { id: string; nombre: string }[]) => (
+      <select className="entrada filtro-col" value={f} onChange={(e) => poner(e.target.value)} aria-label={`Filtrar ${c.n}`}>
+        <option value="">Todos</option>
+        {opciones.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
+        <option value="__vacio">(vacío)</option>
+      </select>
+    );
+    switch (c.tipo) {
+      case "etapa": return sel(ETAPAS.map((e) => ({ id: e.id, nombre: e.nombre })));
+      case "lista": {
+        const usados = Array.from(new Set((leads ?? []).map((l) => (l as any)[c.k]).filter(Boolean))) as string[];
+        const ops = Array.from(new Set([...de(c.k).map((o) => o.valor), ...usados]));
+        return sel(ops.map((v) => ({ id: v, nombre: v })));
+      }
+      case "asesor": return sel(asesores);
+      case "broker": return sel(brokers);
+      case "desarrollo": return sel(DESARROLLOS);
+      case "origen": return sel(ORIGENES.map((o) => ({ id: o.id, nombre: o.nombre })));
+      case "fecha": return <input type="date" className="entrada filtro-col" value={f} onChange={(e) => poner(e.target.value)} title="Desde esta fecha" aria-label={`${c.n} desde`} />;
+      case "numero": return <input className="entrada filtro-col" inputMode="numeric" placeholder="Mínimo" value={f} onChange={(e) => poner(e.target.value)} aria-label={`${c.n} mínimo`} />;
+      default: return <input className="entrada filtro-col" placeholder="Contiene…" value={f} onChange={(e) => poner(e.target.value)} aria-label={`Filtrar ${c.n}`} />;
+    }
+  }
 
   async function editar(l: Lead, k: string, v: string) {
     const valor = v === "" ? null : v;
@@ -118,11 +173,17 @@ function Leads() {
               <option value="todos">Todos los orígenes</option>
               {ORIGENES.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
             </select>
+            <select id="f-desarrollo" className="entrada" style={{ width: "auto" }} value={desarrollo} onChange={(e) => setDesarrollo(e.target.value)}>
+              <option value="todos">Todos los desarrollos</option>
+              {DESARROLLOS.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+              <option value="__vacio">Sin desarrollo</option>
+            </select>
             <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
               <input id="f-pendientes" type="checkbox" checked={soloPendientes} onChange={(e) => setSoloPendientes(e.target.checked)} />
               Seguimiento para hoy
             </label>
             <div className="espacio" />
+            {hayFiltros && <button className="boton chico" onClick={limpiar}><FilterX size={14} /> Quitar filtros</button>}
             <small style={{ color: "var(--texto-3)" }}>{visibles.length} leads</small>
             <div style={{ position: "relative" }} ref={menuRef}>
               <button className="boton" onClick={() => setMenuCols((m) => !m)}><Columns3 size={15} /> Columnas</button>
@@ -145,6 +206,10 @@ function Leads() {
             <table className="tabla">
               <thead>
                 <tr><th>Lead</th>{cols.map((c) => <th key={c.k}>{c.n}</th>)}</tr>
+                <tr className="fila-filtros">
+                  <th><input className="entrada filtro-col" placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar lead" /></th>
+                  {cols.map((c) => <th key={c.k}>{filtroDe(c)}</th>)}
+                </tr>
               </thead>
               <tbody>
                 {visibles.map((l) => (
@@ -169,7 +234,7 @@ function Leads() {
             {!leads && !error && <div className="vacio">Cargando…</div>}
           </div>
         </div>
-        <small style={{ color: "var(--texto-3)" }}>Los desplegables de la tabla se guardan al cambiarlos. Con “Columnas” eliges qué ver.</small>
+        <small style={{ color: "var(--texto-3)" }}>Los desplegables de la tabla se guardan al cambiarlos. Con “Columnas” eliges qué ver; debajo de cada encabezado puedes filtrar esa columna.</small>
       </div>
       {nuevo && <NuevoLead onCerrar={() => setNuevo(false)} onCreado={(id) => router.push(`/leads/${id}`)} />}
       {toast}
