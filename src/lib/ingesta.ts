@@ -113,7 +113,7 @@ export async function asesorDeGuardia(db: SupabaseClient, desarrollo: string | n
     .eq("fecha", fecha).lte("hora_inicio", `${hora}:00`).gt("hora_fin", `${hora}:00`);
   const candidatos = (turnos ?? []).filter((t: any) => t.perfiles?.activo !== false && (!t.desarrollo || !desarrollo || t.desarrollo === desarrollo));
   if (!candidatos.length) return null;
-  const ids = Array.from(new Set(candidatos.map((t: any) => t.asesor_id as string)));
+  const ids: string[] = Array.from(new Set<string>(candidatos.map((t: any) => String(t.asesor_id))));
   const { data: hoy } = await db.from("leads").select("asesor_id").in("asesor_id", ids).gte("created_at", `${fecha}T00:00:00-06:00`);
   const cuenta = new Map(ids.map((id) => [id, 0]));
   (hoy ?? []).forEach((l: any) => cuenta.set(l.asesor_id, (cuenta.get(l.asesor_id) ?? 0) + 1));
