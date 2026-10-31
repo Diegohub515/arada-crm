@@ -254,10 +254,12 @@ function Chat({ conv, onVolver }: { conv: ConvConLead; onVolver: () => void }) {
 
   // WhatsApp por Zapier: se contesta por la automatización "crm-a-whatsapp" y solo dentro de las 24 h
   const porZapier = String(conv.zernio_conversation_id ?? "").startsWith("wa:");
+  // WhatsApp (por Zapier o por Zernio): aplica la regla de las 24 h y las plantillas
+  const esWhatsApp = porZapier || String(conv.plataforma ?? "").includes("whatsapp");
   const puedeEscribir = !!conv.zernio_account_id || porZapier;
   const ultimoCliente = [...mensajes].reverse().find((m) => m.direccion === "entrante");
   const msRestantes = ultimoCliente ? new Date(ultimoCliente.created_at).getTime() + 24 * 3600 * 1000 - Date.now() : -1;
-  const ventanaCerrada = porZapier && msRestantes <= 0;
+  const ventanaCerrada = esWhatsApp && msRestantes <= 0;
   const horasRestantes = Math.max(0, Math.floor(msRestantes / 3600000));
 
   return (
@@ -321,14 +323,14 @@ function Chat({ conv, onVolver }: { conv: ConvConLead; onVolver: () => void }) {
         </div>
       )}
       {error && <div className="error-caja" style={{ margin: "0 14px 8px" }}>{error}</div>}
-      {porZapier && mensajes.length > 0 && (
+      {esWhatsApp && mensajes.length > 0 && (
         <div className="aviso-caja" style={{ margin: "0 14px 8px" }}>
           {ventanaCerrada
             ? "Pasaron más de 24 h desde el último mensaje del cliente: WhatsApp solo permite mandarle una plantilla aprobada (como las de RMKT)."
             : `Puedes contestarle por WhatsApp ${horasRestantes > 0 ? `durante ${horasRestantes} h más` : "por menos de 1 h más"}. Al contestar tú, el bot se pausa en este chat.`}
         </div>
       )}
-      {porZapier && conv.leads && (ventanaCerrada || mensajes.length === 0) && (
+      {esWhatsApp && conv.leads && (ventanaCerrada || mensajes.length === 0) && (
         <div className="tarjeta" style={{ margin: "0 14px 12px", padding: 12 }}>
           <EnviarPlantilla leadId={conv.leads.id} compacto onEnviado={() => cargar()} />
         </div>

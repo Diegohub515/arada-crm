@@ -34,22 +34,126 @@ async function llamar(ruta: string, init: RequestInit & { idempotencia?: string 
   return datos;
 }
 
-/** Envía un mensaje de texto a una conversación existente. */
+/** Envía un mensaje (texto y, opcional, un archivo por URL pública) a una conversación existente. */
 export async function enviarMensaje(opts: {
   conversationId: string;
   accountId: string;
   texto: string;
   idempotencia: string;
+  adjuntoUrl?: string;
+  adjuntoTipo?: "image" | "video" | "audio" | "file";
+  adjuntoNombre?: string;
 }) {
+  const cuerpo: Record<string, unknown> = { accountId: opts.accountId };
+  if (opts.texto) cuerpo.message = opts.texto;
+  if (opts.adjuntoUrl) {
+    cuerpo.attachmentUrl = opts.adjuntoUrl;
+    cuerpo.attachmentType = opts.adjuntoTipo ?? "file";
+    if (opts.adjuntoNombre) cuerpo.attachmentName = opts.adjuntoNombre;
+  }
   const res = await llamar(`/v1/inbox/conversations/${encodeURIComponent(opts.conversationId)}/messages`, {
     method: "POST",
     idempotencia: opts.idempotencia,
-    body: JSON.stringify({ accountId: opts.accountId, message: opts.texto }),
+    body: JSON.stringify(cuerpo),
   });
   return {
     messageId: (res?.data?.messageId as string | undefined) ?? null,
     advertencias: (res?.warnings as { message?: string }[] | undefined) ?? [],
     fallaParcial: res?.data?.partialFailure?.error as string | undefined,
+  };
+}
+
+/**
+ * Manda una plantilla aprobada de WhatsApp. Si ya hay conversación en Zernio la usa;
+ * si no, la crea con el teléfono (así se le escribe primero a un lead nuevo).
+ */
+export async function enviarPlantillaWhatsApp(opts: {
+  accountId: string;
+  telefono: string; // 52XXXXXXXXXX
+  plantilla: string;
+  idioma: string;
+  imagenUrl?: string | null;
+  conversationId?: string | null;
+  idempotencia: string;
+}) {
+  if (opts.conversationId) {
+    const componentes = opts.imagenUrl
+      ? [{ type: "header", parameters: [{ type: "image", image: { link: opts.imagenUrl } }] }]
+      : undefined;
+    const res = await llamar(`/v1/inbox/conversations/${encodeURIComponent(opts.conversationId)}/messages`, {
+      method: "POST",
+      idempotencia: opts.idempotencia,
+      body: JSON.stringify({
+        accountId: opts.accountId,
+        template: { elements: [{ name: opts.plantilla, language: opts.idioma, ...(componentes ? { components: componentes } : {}) }] },
+      }),
+    });
+    return { messageId: (res?.data?.messageId as string | undefined) ?? null, conversationId: opts.conversationId };
+  }
+  const res = await llamar(`/v1/inbox/conversations`, {
+    method: "POST",
+    idempotencia: opts.idempotencia,
+    body: JSON.stringify({
+      accountId: opts.accountId,
+      participantId: opts.telefono.replace(/\D/g, ""),
+      templateName: opts.plantilla,
+      templateLanguage: opts.idioma,
+      ...(opts.imagenUrl ? { headerMedia: { type: "image", link: opts.imagenUrl } } : {}),
+    }),
+  });
+  return {
+    messageId: (res?.data?.messageId as string | undefined) ?? null,
+    conversationId: (res?.data?.conversationId as string | undefined) ?? null,
+  };
+}
+
+/** ID de la cuenta de WhatsApp conectada en Zernio (variable de entorno o la primera que encuentre). */
+let cuentaWaCache: string | null = null;
+export async function cuentaWhatsApp(): Promise<string | null> {
+  if (process.env.ZERNIO_WHATSAPP_ACCOUNT_ID) return process.env.ZERNIO_WHATSAPP_ACCOUNT_ID;
+  if (cuentaWaCache) return cuentaWaCache;
+  const res = await llamar(`/v1/accounts?platform=whatsapp`);
+  const lista: any[] = res?.accounts ?? res?.data ?? [];
+  const cuenta = lista.find((a) => String(a.platform).toLowerCase() === "whatsapp" && a.isActive !== false) ?? lista[0];
+  cuentaWaCache = cuenta?._id ?? cuenta?.id ?? cuenta?.accountId ?? null;
+  return cuentaWaCache;
+}
+
+/** Conversaciones de WhatsApp en Zernio (para importar el historial). */
+export async function listarConversaciones(accountId: string, cursor?: string | null) {
+  const qs = new URLSearchParams({ accountId, platform: "whatsapp", limit: "50", sortOrder: "desc" });
+  if (cursor) qs.set("cursor", cursor);
+  const res = await llamar(`/v1/inbox/conversations?${qs}`);
+  return {
+    conversaciones: (res?.data ?? []) as any[],
+    siguiente: (res?.pagination?.nextCursor as string | null | undefined) ?? null,
+    hayMas: !!res?.pagination?.hasMore,
+  };
+}
+
+/** Busca en Zernio la conversación de WhatsApp de un teléfono (10 dígitos o con lada). */
+export async function buscarConversacionWhatsApp(accountId: string, telefono: string): Promise<string | null> {
+  const diez = telefono.replace(/\D/g, "").slice(-10);
+  if (diez.length < 10) return null;
+  const qs = new URLSearchParams({ query: diez, platform: "whatsapp", accountId, limit: "10" });
+  const res = await llamar(`/v1/inbox/conversations/search?${qs}`);
+  const lista: any[] = res?.data ?? res?.conversations ?? [];
+  for (const item of lista) {
+    const c = item?.conversation ?? item;
+    const participante = String(c?.participantId ?? c?.participant?.id ?? "").replace(/\D/g, "");
+    if (participante.endsWith(diez)) return c?.id ?? c?.conversationId ?? null;
+  }
+  return null;
+}
+
+/** Mensajes de una conversación, del más viejo al más nuevo. */
+export async function listarMensajes(conversationId: string, accountId: string, cursor?: string | null) {
+  const qs = new URLSearchParams({ accountId, limit: "100", sortOrder: "asc" });
+  if (cursor) qs.set("cursor", cursor);
+  const res = await llamar(`/v1/inbox/conversations/${encodeURIComponent(conversationId)}/messages?${qs}`);
+  return {
+    mensajes: (res?.messages ?? res?.data ?? []) as any[],
+    siguiente: (res?.pagination?.nextCursor as string | null | undefined) ?? null,
   };
 }
 
@@ -76,16 +180,26 @@ export function leerEventoMensaje(p: any) {
   const s = m?.sender ?? {};
   const conv = p?.conversation ?? {};
   const cuenta = p?.account ?? {};
+  const saliente = p?.event === "message.sent" || m?.direction === "outgoing";
   return {
-    conversationId: primerTexto(conv.id, conv.conversationId, p?.conversationId),
+    conversationId: primerTexto(conv.id, m.conversationId, conv.conversationId, p?.conversationId),
     accountId: primerTexto(cuenta.accountId, cuenta.id, p?.accountId),
-    plataforma: primerTexto(p?.platform, cuenta.platform, conv.platform, m?.platform)?.toLowerCase() ?? null,
-    messageId: primerTexto(m.id, m.messageId, m.platformMessageId),
-    texto: primerTexto(m.text, m.message, m.body) ?? (Array.isArray(m.attachments) && m.attachments.length ? "📎 Archivo adjunto" : ""),
-    adjuntos: Array.isArray(m.attachments) ? m.attachments : null,
-    remitenteNombre: primerTexto(s.name, s.displayName, s.username, conv.participantName, conv.contactName),
-    remitenteId: primerTexto(s.phone, s.phoneNumber, s.id, s.username, conv.participantId, p?.profiles?.[0]?.externalId),
-    fecha: primerTexto(m.createdAt, m.timestamp, p?.timestamp) ?? new Date().toISOString(),
+    plataforma: primerTexto(p?.platform, cuenta.platform, m?.platform, conv.platform)?.toLowerCase() ?? null,
+    // En WhatsApp el id de la plataforma (wamid) es el mismo que regresa el envío: así no se duplica
+    messageId: primerTexto(m.platformMessageId, m.id, m.messageId),
+    texto: primerTexto(m.text, m.message, m.body) ?? (Array.isArray(m.attachments) && m.attachments.length ? `📎 ${m.attachments[0]?.type === "image" ? "Imagen" : m.attachments[0]?.type === "audio" ? "Audio" : "Archivo adjunto"}` : ""),
+    adjuntos: Array.isArray(m.attachments) && m.attachments.length ? m.attachments : null,
+    // El cliente: en mensajes enviados el "sender" es el negocio, así que se lee de la conversación
+    remitenteNombre: saliente
+      ? primerTexto(conv.participantName, conv.contactName)
+      : primerTexto(s.name, s.displayName, conv.participantName, s.username, conv.contactName),
+    remitenteId: saliente
+      ? primerTexto(conv.participantId)
+      : primerTexto(s.phoneNumber, s.phone, s.id, conv.participantId, s.username, p?.profiles?.[0]?.externalId),
+    fecha: primerTexto(m.sentAt, m.createdAt, m.timestamp, p?.timestamp) ?? new Date().toISOString(),
+    /** "whatsapp_business_app" = lo mandaron desde el celular; "cloud_api" = API */
+    origen: primerTexto(m.source, m.metadata?.source),
+    enviadoPor: primerTexto(m.sentVia),
   };
 }
 

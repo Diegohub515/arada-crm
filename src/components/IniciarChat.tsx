@@ -39,12 +39,14 @@ export function EnviarPlantilla({ leadId, onEnviado, compacto }: { leadId: strin
       setEnviando(false);
       return setError(d.error ?? "No se pudo enviar la plantilla.");
     }
+    // El chat de ese lead (por Zernio, o el "wa:…" mientras WhatsApp siga en Zapier)
     const { data: lead } = await db.from("leads").select("telefono").eq("id", leadId).single();
     const corto = normalizarTelefono(lead?.telefono);
-    const { data: conv } = await db.from("conversaciones").select("id")
-      .eq("zernio_conversation_id", `wa:${corto}`).maybeSingle();
+    const { data: convs } = await db.from("conversaciones").select("id")
+      .or(`zernio_conversation_id.eq.wa:${corto},contacto_id.eq.${corto},lead_id.eq.${leadId}`)
+      .order("ultimo_mensaje_at", { ascending: false, nullsFirst: false }).limit(1);
     setEnviando(false);
-    onEnviado(conv?.id ?? null);
+    onEnviado(convs?.[0]?.id ?? null);
   }
 
   const p = plantillas?.find((x) => x.id === elegida);

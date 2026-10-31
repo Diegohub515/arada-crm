@@ -3,10 +3,12 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { firmaValida, leerEventoLead, leerEventoMensaje } from "@/lib/zernio";
 import { buscarCampo, guardarLead, origenDePlataforma } from "@/lib/ingesta";
 import { ejecutarAgente, revisarRespuestaExterna } from "@/lib/agente";
+import { botVivia } from "@/lib/bot/vivia";
+import { normalizarTelefono } from "@/lib/formato";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60; // el agente corre después de contestarle a Zernio
+export const maxDuration = 60; // el bot corre después de contestarle a Zernio (espera + IA + pausa entre partes)
 
 /**
  * Recibe los eventos de Zernio:
@@ -63,6 +65,23 @@ async function procesarMensaje(db: ReturnType<typeof supabaseAdmin>, p: any, dir
 
   let conversacionId = existente?.id as string | undefined;
   let leadId = (existente?.lead_id as string | null) ?? null;
+  let contactoNombre = (existente?.contacto_nombre as string | null) ?? null;
+  const esWhatsApp = (m.plataforma ?? "").includes("whatsapp");
+  const telefono = esWhatsApp ? normalizarTelefono(m.remitenteId) : null;
+
+  // WhatsApp que antes entraba por Zapier ("wa:8112345678"): se pasa a Zernio sin perder el historial
+  if (!conversacionId && telefono) {
+    const { data: vieja } = await db.from("conversaciones").select("id, lead_id, contacto_nombre")
+      .eq("zernio_conversation_id", `wa:${telefono}`).maybeSingle();
+    if (vieja) {
+      await db.from("conversaciones").update({
+        zernio_conversation_id: m.conversationId, zernio_account_id: m.accountId, plataforma: "whatsapp", contacto_id: telefono,
+      }).eq("id", vieja.id);
+      conversacionId = vieja.id;
+      leadId = vieja.lead_id ?? null;
+      contactoNombre = vieja.contacto_nombre ?? null;
+    }
+  }
 
   if (!conversacionId) {
     const { data, error } = await db
@@ -71,8 +90,8 @@ async function procesarMensaje(db: ReturnType<typeof supabaseAdmin>, p: any, dir
         zernio_conversation_id: m.conversationId,
         zernio_account_id: m.accountId,
         plataforma: m.plataforma,
-        contacto_nombre: direccion === "entrante" ? m.remitenteNombre : null,
-        contacto_id: direccion === "entrante" ? m.remitenteId : null,
+        contacto_nombre: m.remitenteNombre,
+        contacto_id: telefono ?? m.remitenteId,
       })
       .select("id")
       .single();
@@ -85,7 +104,7 @@ async function procesarMensaje(db: ReturnType<typeof supabaseAdmin>, p: any, dir
     const esTelefono = m.remitenteId && /^\+?\d[\d\s-]{7,}$/.test(m.remitenteId);
     const r = await guardarLead(db, {
       nombre: m.remitenteNombre,
-      telefono: esTelefono ? m.remitenteId : null,
+      telefono: telefono ?? (esTelefono ? m.remitenteId : null),
       origen: origenDePlataforma(m.plataforma),
       notas: m.texto ? `Primer mensaje: ${m.texto}` : null,
       externalId: `zernio-conv:${m.conversationId}`,
@@ -110,11 +129,16 @@ async function procesarMensaje(db: ReturnType<typeof supabaseAdmin>, p: any, dir
 
   // 4. Agente de IA: contesta después de responderle OK a Zernio (Zernio solo espera 5 s).
   if (fila && direccion === "entrante") {
-    after(() => ejecutarAgente(db, conversacionId!, fila.id).catch((e) => console.error("Agente IA:", e)));
+    if (esWhatsApp) after(() => botVivia(db, conversacionId!, fila.id).catch((e) => console.error("Bot Vivia:", e)));
+    else after(() => ejecutarAgente(db, conversacionId!, fila.id).catch((e) => console.error("Agente IA:", e)));
   }
-  // Si alguien contestó desde el celular o desde Zernio, el agente se hace a un lado en ese chat.
-  if (fila && direccion === "saliente") {
-    after(() => revisarRespuestaExterna(db, fila.id, conversacionId!, m.texto).catch(() => {}));
+  // Alguien contestó desde el celular (WhatsApp Business) o desde Zernio: el bot se hace a un lado en ese chat.
+  if (fila && direccion === "saliente" && m.enviadoPor !== "api") {
+    if (m.origen === "whatsapp_business_app") {
+      await db.from("conversaciones").update({ agente_activo: false, agente_motivo: "Un asesor contestó desde el celular" }).eq("id", conversacionId);
+    } else {
+      after(() => revisarRespuestaExterna(db, fila.id, conversacionId!, m.texto).catch(() => {}));
+    }
   }
 
   await db
@@ -123,7 +147,7 @@ async function procesarMensaje(db: ReturnType<typeof supabaseAdmin>, p: any, dir
       lead_id: leadId,
       zernio_account_id: m.accountId ?? undefined,
       plataforma: m.plataforma ?? undefined,
-      contacto_nombre: existente?.contacto_nombre ?? (direccion === "entrante" ? m.remitenteNombre : undefined),
+      contacto_nombre: contactoNombre ?? m.remitenteNombre ?? undefined,
       ultimo_mensaje: m.texto,
       ultimo_mensaje_at: m.fecha,
       no_leidos: direccion === "entrante" ? (existente?.no_leidos ?? 0) + 1 : 0,

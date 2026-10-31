@@ -4,6 +4,7 @@ import { supabaseServidor } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { enviarMensaje, marcarLeida } from "@/lib/zernio";
 import { telefonoWhatsApp } from "@/lib/formato";
+import { enlazarConZernio, whatsappPorZernio } from "@/lib/whatsapp";
 
 export const runtime = "nodejs";
 
@@ -26,9 +27,16 @@ export async function POST(req: Request) {
     .single();
   if (!conv) return NextResponse.json({ error: "No encontré esa conversación" }, { status: 404 });
 
-  // Chats de WhatsApp que entran por Zapier: se mandan por la automatización "crm-a-whatsapp"
+  // Chats de WhatsApp guardados como "wa:…" (entraron por Zapier)
   if (String(conv.zernio_conversation_id ?? "").startsWith("wa:")) {
-    return enviarPorZapier(db, conv, texto.trim(), auth.user.id);
+    if (!whatsappPorZernio()) return enviarPorZapier(db, conv, texto.trim(), auth.user.id);
+    // WhatsApp ya va por Zernio: se enlaza el chat con su conversación en Zernio
+    const enlace = await enlazarConZernio(db, conv).catch(() => null);
+    if (!enlace) {
+      return NextResponse.json({ error: "Este chat todavía no existe en Zernio. Mándale una plantilla para abrirlo, o espera a que el cliente escriba." }, { status: 400 });
+    }
+    conv.zernio_conversation_id = enlace.conversationId;
+    conv.zernio_account_id = enlace.accountId;
   }
 
   if (!conv.zernio_account_id) {

@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { Barra } from "@/components/Marco";
+import ImportarHistorial from "@/components/ImportarHistorial";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function Configuracion() {
     { nombre: "Zernio (recibir mensajes y leads)", ok: !!process.env.ZERNIO_WEBHOOK_SECRET, falta: "ZERNIO_WEBHOOK_SECRET" },
     { nombre: "Entrada de leads (Zapier, Google, landings)", ok: !!process.env.LEADS_WEBHOOK_TOKEN, falta: "LEADS_WEBHOOK_TOKEN" },
     { nombre: "IA (agente que contesta, sugerencias y análisis)", ok: !!process.env.ANTHROPIC_API_KEY, falta: "ANTHROPIC_API_KEY" },
+    { nombre: "WhatsApp por Zernio (bot en el CRM)", ok: (process.env.WHATSAPP_VIA ?? "").toLowerCase() === "zernio", falta: "WHATSAPP_VIA = zernio (mientras no esté, WhatsApp sigue por Zapier)" },
   ];
 
   return (
@@ -46,7 +48,9 @@ export default async function Configuracion() {
               <li>En <b>Secret</b> pega la misma frase que pusiste en <code>ZERNIO_WEBHOOK_SECRET</code>.</li>
               <li>Marca los eventos <b>message.received</b>, <b>message.sent</b> y <b>lead.received</b>.</li>
               <li>Usa el botón de prueba de Zernio: debe responder “OK”.</li>
+              <li>Cuando WhatsApp ya esté conectado en Zernio, trae los chats viejos (hasta 6 meses) a la Bandeja:</li>
             </ol>
+            <ImportarHistorial />
           </div>
         </div>
 
